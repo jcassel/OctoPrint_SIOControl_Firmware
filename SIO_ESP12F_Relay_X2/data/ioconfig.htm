@@ -1,0 +1,44 @@
+<!DOCTYPE HTML><html><head><title>SIO Control IO Configuration</title>
+<link rel="stylesheet" type="text/css" href="/style.css"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"></head>
+	<body>
+		<div id="loader" class="lds-dual-ring overlay hidden"></div>
+		<div id="action" class="normal hidden" ></div>
+		<div id="gcontainer" class="grid-container hidden">
+		  <div class="header"><span id="deviceInfo" >...</span></div>
+		  <div class="menu">	
+			<ul class="topnav">
+			  <li><a href="/config">Configuration</a></li>
+			  <li><a class="active" href="/ioconfig">IO Config</a></li>
+			  <!--<li><a href="/spiffs">File Upload</a></li>
+			  <li class="right"><a href="/update">Update Firmware</a></li>-->
+			</ul>
+		  </div>
+		  
+		  <div  id="main" class="main ">
+			<form id="frm" class="frm" method='POST' action='/ioconfig'>
+			<table >
+			<tr><th>IO POINT</th><th>IO POINT Type</th>
+			<tr><td>IO-0</td><td><select name="cbo_io0_type" id="cbo_io0_type"><option value="1">OUTPUT</option><option value="3">OUTPUT_OPEN_DRAIN</option><option value="0">INPUT</option><option value="2">INPUT_PULLUP</option></select></td></tr>
+			<tr><td>IO-1</td><td><select name="cbo_io1_type" id="cbo_io1_type"><option value="1">OUTPUT</option><option value="3">OUTPUT_OPEN_DRAIN</option><option value="0">INPUT</option><option value="2">INPUT_PULLUP</option></select></td></tr>
+			<tr><td>IO-2</td><td><select name="cbo_io2_type" id="cbo_io2_type"><option value="1">OUTPUT</option><option value="3">OUTPUT_OPEN_DRAIN</option><option value="0">INPUT</option><option value="2">INPUT_PULLUP</option></select></td></tr>
+			<tr><td>IO-3</td><td><select name="cbo_io3_type" id="cbo_io3_type"><option value="1">OUTPUT</option><option value="3">OUTPUT_OPEN_DRAIN</option><option value="0">INPUT</option><option value="2">INPUT_PULLUP</option></select></td></tr>
+			<tr><td>IO-4</td><td><select name="cbo_io4_type" id="cbo_io4_type"><option value="1">OUTPUT</option><option value="3">OUTPUT_OPEN_DRAIN</option><option value="0">INPUT</option><option value="2">INPUT_PULLUP</option></select></td></tr>
+			<tr><td>IO-5</td><td><select name="cbo_io5_type" id="cbo_io5_type"><option value="1">OUTPUT</option><option value="3">OUTPUT_OPEN_DRAIN</option><option value="0">INPUT</option><option value="2">INPUT_PULLUP</option></select></td></tr>
+			<tr><td>IO-6</td><td><select name="cbo_io6_type" id="cbo_io6_type"><option value="1">OUTPUT</option><option value="3">OUTPUT_OPEN_DRAIN</option><option value="0">INPUT</option><option value="2">INPUT_PULLUP</option></select></td></tr>
+			</table>		
+			<h4><div><input type='submit' name='update' value='Update'/> </div></h4>
+			<h4><div><input type='submit' name='reboot' value='Reboot'/> </div></h4>
+			<h4>Status:<span id="status"></span></h4>
+			</form>
+		  </div>  
+		  <div class="footer"><span id="firmwareV"></span></div>
+		</div>
+		<script>
+			var domReady = function(callback) {
+					document.readyState === "interactive" || document.readyState === "complete" ? callback() : document.addEventListener("DOMContentLoaded", callback);
+			};
+		</script>
+		<script type="application/javascript" src="ioconfig.js"></script>  
+  	</body>
+</html>

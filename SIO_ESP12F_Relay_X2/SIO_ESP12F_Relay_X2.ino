@@ -1,54 +1,31 @@
-//simple Serial IO Driver
+//Simple Serial IO Driver
 //Takes serial commands to control configured IO.
-//Can create automations for interactions between inputs, outputs and actions. (Future)
-
-//Eventually should support a closed loop temerature control. Need to have a sensor and a output to control a heating element. Could also do a fan / exaust system to cool enclosure down. 
-//Likely will want to do the config for this in a web page but could be done also through OctoPrint
-
-//Target outputs 
-//Digital/relay: PSU,Lighting,Enclosure heater, alarm, filter relay,exaust fan
-//Digital (PWM):cooling fan(PWM*) (Future)
-
-//Target inputs
-//Digital: General switches(NO or NC Selectable)
-//temperature inputs(Future + TBA on type)
-
-
-#define VERSIONINFO "SIO_ESP12F_Relay_X2 1.0.5"
-#define COMPATIBILITY "SIOPlugin 0.1.1"
-#include "TimeRelease.h"
-#include <ArduinoJson.h> 
+//Reports IO status created for use with OctoPrint_SIOControl_plugin
+#include <Bounce2.h>
 #include "FS.h"
+#include <ArduinoJson.h> 
+
+#include "global.h"
+#define _GDebug 
+#define USE_DIGESTAUTH
+#define VERSIONINFO "SIO_ESP12F_Relay_X2 1.0.6"
+#define COMPATIBILITY "SIOPlugin 0.1.1"
+#define DEFAULT_HOSTS_NAME "SIOControler-New"
+#include "TimeRelease.h"
+
+
 #define FS_NO_GLOBALS
 #include <ESP8266WiFi.h>
-#include <Bounce2.h>
-
-//gpio 0,2 and, 15 presents some challanges for use as an IO point. You can use at least 2 of them for IO but you must do it in the specific way needed for the specific pin.
-//These are not including in the IO list here due to this challange.
-//this link has some details on how to use the IO points 0,2 and 15 as inputs or outputs
-//https://www.instructables.com/ESP8266-Using-GPIO0-GPIO2-as-inputs/
-
-#define IO0 LED_BUILTIN //Ya this is on the chip.. so we can show some kind of staus of we want. good test IO Point to play with. Blue LED on MCU
-#define IO1 5 //  Relay1 has relay and red led D1 on board near power in terminal
-#define IO2 4//   Relay1 has relay and red led D4 on board near power in terminal
-#define IO3 16// has blue LED on board D7 
-#define IO4 14//   
-#define IO5 12//
-#define IO6 13//  
-
- 
-  
-//#define IOA A0//Analog 0 
+#include <ESP8266WebServer.h>
+#include <ESP8266mDNS.h>
+#include <NTPClient.h>
+#include <Time.h>        
+#include <TimeLib.h>
 
 
-#define IOSize  7
-bool _debug = false;
-int IOType[IOSize]{OUTPUT,OUTPUT,OUTPUT,OUTPUT,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP};
-int IOMap[IOSize] {IO0,IO1,IO2,IO3,IO4,IO5,IO6};
-String IOSMap[IOSize] {"IO0","IO1","IO2","IO3","IO4","IO5","IO6"};
-int IO[IOSize];
-Bounce Bnc[IOSize];
-bool EventTriggeringEnabled = 1;
+#include "wifiCommon.h"
+#include "webPages.h"
+
 
 
 bool isOutPut(int IOP){
@@ -81,12 +58,16 @@ unsigned long reportInterval = 3000;
 
 
 void setup() {
-  // put your setup code here, to run once:
+  delay(100);
+  #ifdef _GDebug
+    _debug = true;
+  #endif
+  
   Serial.begin(115200);
   delay(300);
   debugMsg(VERSIONINFO);
-  debugMsg("Disabling Wifi");
-  WiFi.mode(WIFI_OFF);    //The entire point of this project is to not use wifi but have directly connected IO for use with the OctoPrint PlugIn and subPlugIn
+  
+  
   debugMsg("Start Types");
   InitStorageSetup();
   loadIOConfig();
@@ -96,7 +77,7 @@ void setup() {
   reportIOTypes();
   
   debugMsg("End Types");
-  _debug = false;
+  
   //need to get a baseline state for the inputs and outputs.
   for (int i=0;i<IOSize;i++){
     IO[i] = digitalRead(IOMap[i]);  
@@ -105,6 +86,26 @@ void setup() {
   IOReport.set(100ul);
   ReadyForCommands.set(reportInterval); //Initial short delay resets will be at 3x
   DisplayIOTypeConstants();
+
+
+  //debugMsg("Disabling Wifi");
+  //WiFi.mode(WIFI_OFF);    //The entire point of this project is to not use wifi but have directly connected IO for use with the OctoPrint PlugIn and subPlugIn
+  SetupWifi();
+  if(_debug){
+    DebugwifiConfig();
+  }
+  if(!loadSettings()){
+    #ifdef _debug
+    Serial.println("Settings Config Loaded");
+    #endif
+  }
+  
+  debugMsg("begin init pages");
+  initialisePages();
+  debugMsg("end init pages");
+  webServer.begin();
+  debugMsg("end webserver.begin");
+
   
 }
 
@@ -124,6 +125,8 @@ void loop() {
       ReadyForCommands.set(reportInterval *3);
     }
   }
+  CheckWifi();
+  
   
 }
 //*********************End loop***************************//
@@ -332,6 +335,66 @@ void checkSerial(){
       reportIO(true);
       return; 
     }
+    
+    else if(command == "WF"){
+      
+      if(value == "netstat"){ack();PrintNetStat();}
+      if(value.startsWith("set")){
+        ack();
+        WifiConfig wfconfig;
+        
+        //wfconfig.ssid = wifiConfig.ssid;
+        strlcpy(wfconfig.ssid, wifiConfig.ssid, sizeof(wfconfig.ssid));
+        //wfconfig.password = wifiConfig.password;
+        strlcpy(wfconfig.password, wifiConfig.password, sizeof(wfconfig.password));
+        //wfconfig.wifimode = wifiConfig.wifimode;
+        strlcpy(wfconfig.wifimode, wifiConfig.wifimode, sizeof(wfconfig.wifimode));
+        //wfconfig.hostname = wifiConfig.hostname;
+        strlcpy(wfconfig.hostname, wifiConfig.hostname, sizeof(wfconfig.hostname));
+        wfconfig.attempts = wifiConfig.attempts;
+        wfconfig.attemptdelay = wifiConfig.attemptdelay;
+        //wfconfig.apPassword = wifiConfig.apPassword;
+        strlcpy(wfconfig.apPassword, wifiConfig.apPassword, sizeof(wfconfig.apPassword));
+        String nameValuePare = value.substring(value.indexOf(" ")+1);
+        String setting = nameValuePare.substring(0,nameValuePare.indexOf(" "));
+        String newValue = nameValuePare.substring(nameValuePare.indexOf(" ")+1);
+        if(_debug){
+        Serial.print("Wifi Setting entered:");Serial.println(setting);
+        Serial.print("Wifi value entered:");Serial.println(newValue);
+        }
+        if(setting == "ssid"){
+          //wfconfig.ssid = newValue;
+          strlcpy(wfconfig.ssid, newValue.c_str(), sizeof(wfconfig.ssid));
+        }else if (setting == "password"){
+          //wfconfig.password = newValue;
+          strlcpy(wfconfig.password, newValue.c_str(), sizeof(wfconfig.password));
+        }else if (setting == "hostname"){
+          //wfconfig.hostname = newValue;
+          strlcpy(wfconfig.hostname, newValue.c_str(), sizeof(wfconfig.hostname));
+        }else if (setting == "attempts"){
+          wfconfig.attempts = newValue.toInt();
+        }else if (setting == "attemptdelay"){
+          wfconfig.attemptdelay = newValue.toInt();
+        }else if (setting == "apPassword"){
+          //wfconfig.apPassword = newValue;
+          strlcpy(wfconfig.apPassword, newValue.c_str(), sizeof(wfconfig.apPassword));
+        }else if (setting == "wifimode"){
+          // WIFI_AP or WIFI_STA
+          if(newValue == "STA"){
+            //wfconfig.wifimode = "WIFI_STA";
+            strlcpy(wfconfig.wifimode, "WIFI_STA", sizeof(wfconfig.wifimode));
+          }else if(newValue == "AP"){
+            //wfconfig.wifimode = "WIFI_AP";
+            strlcpy(wfconfig.wifimode, "WIFI_AP", sizeof(wfconfig.wifimode));
+          }
+        }
+        if(_debug){
+          debugMsg("saving updates to wifiConfig");
+        }
+        savewifiConfig(wfconfig);
+        loadwifiConfig();
+      }
+    }
     else{
       debugMsg("ERROR: Unrecognized command["+command+"]");
     }
@@ -362,17 +425,7 @@ bool validateNewIOConfig(String ioConfig){
   return true; //seems its a good set of point Types.
 }
 
-void updateIOConfig(String newIOConfig){
-  for (int i=2;i<IOSize;i++){//start at 2 to avoid D0 and D1
-    int nIOC = newIOConfig.substring(i,i+1).toInt();
-    if(IOType[i] != nIOC){
-      IOType[i] = nIOC;
-      if(nIOC == OUTPUT){
-        digitalWrite(IOMap[i],LOW); //set outputs to low since they will be high coming from INPUT_PULLUP
-      }
-    }
-  }
-}
+
 
 int getIOType(String typeName){
   if(typeName == "INPUT"){return 0;}
@@ -436,36 +489,7 @@ if (!SPIFFS.exists("/IOConfig.json"))
 }
 
 
-bool StoreIOConfig(){
-  SPIFFS.remove("/IOConfig.json");
-  File file = SPIFFS.open("/IOConfig.json", "w");
-  if(_debug){debugMsg("saving IO Config");}
-  DynamicJsonDocument doc(2048);
 
-  JsonObject configObj = doc.to<JsonObject>();
-
-  for (int i=0;i<IOSize;i++){
-    configObj[IOSMap[i]]= getIOTypeString(IOType[i]);
-  }
-  
-  
-  if(_debug){
-    debugMsg("Saved IO as json: ");    
-    String jsonConfig;
-    serializeJson(configObj, jsonConfig); 
-    debugMsg(jsonConfig);
-  }
-    
-  
-  if (serializeJsonPretty(doc, file) == 0)
-  {
-    debugMsg("[WARNING]: Failed to write to file:/IOConfig.json");
-    return false;
-  }
-  file.close();
-  if(_debug){debugMsg("Saved IO Config");}
-  return true;
-}
 
 
 float SpaceLeft(){
@@ -489,26 +513,10 @@ bool IsSpaceLeft()
 
   return true;
 }
-String getIOTypeString(int ioType){
-  if (ioType == 0){return "INPUT";}
-  if (ioType == 1){return "OUTPUT";}
-  if (ioType == 2){return "INPUT_PULLUP";}
-  if (ioType == 3){return "INPUT_PULLDOWN";}
-  if (ioType == 4){return "OUTPUT_OPEN_DRAIN";}
-}
 
 
 
 void InitStorageSetup(){
   SPIFFS.begin();
   //do anything that might be needed related to file and storage on startup.
-}
-
-void debugMsg(String msg){
-  debugMsgPrefx();
-  Serial.println(msg);
-}
-
-void debugMsgPrefx(){
-  Serial.print("DG:");
 }
