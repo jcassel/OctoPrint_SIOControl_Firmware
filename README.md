@@ -1,7 +1,12 @@
-# SIOControlFirmware
-SIOControl Firmware
-## SIO Serial Commands 
+# SIOControl Firmware
+This firmware is designed to work with the SIOControl PlugIn for OctoPrint. It could be used for general control from any device that can send commands over a serial line. 
 
+There are several versions listed. Each targeting a specific board. Knowing what MCU is on that board should give you a good starting point if you have another board with the same MCU.
+
+If you are looking for some support, I will be working on the wiki in the SIOControl PlugIn repository but until that gets up to a usfull level, I lurk a lot on the [OctoPrint community site](https://community.octoprint.org/). Post there in the plugins section and I will likely see it and respond. 
+
+
+## SIO Serial Commands 
 All commands must end with a new line character (\n) If the command is recognized as a valid command the device will respond with an "OK" as an Ack. if it is not recognized, it will return an error in the format of: if command "AA" is sent to the device.A return code of: "ERROR: Unrecognized command[AA]\n" will be sent.
 
 
@@ -15,8 +20,9 @@ In most cases, there are 4 posible values that can be used for each type. 0=inpu
 - SIO Stores current IO point type settings to local storage. This causes the current IO point types to be maintained through restarts of the device.
 - IO [#] [0/1] Sets an IO point {#:position in IO pattern] to a logic level [0:low] [1:HIGH]. Example: "IO 9 1" will set the io point 9 to High 
 - IOT outputs the current IO Point types pattern
-- SI [500-4,294,967,295]  .5 seconds to ~1,193 hours realistically you would want this setting to be no less than 10,000 or 10 seconds to ensure generally acceptable feedback on changes made to the IO.
+- SI [500-4,294,967,295]  .5 seconds to ~1,193 hours realistically you would want this setting to be less than 10,000 or 10 seconds to ensure generally acceptable feedback on changes made to the IO.
 - SE enables or disables event triggering of IO Reports. (on by default). When enabled, a change in IO Status(up or down) will cause a report output to be sent to the host. When disabled, reports are only given on interval. 
 - restart,reboot,reset will all force a restart of the device. (tested on esp8266 and esp32) 
 - GS will force an IO status report. 
 - note that if a command starting with an "N" or "M115" is sent the firmware should issue a disconnect command to the host. This is meant to help when your octoprint setup tries to connect to the SIO Device thinking it is the printer. 
+
