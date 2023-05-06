@@ -1,6 +1,8 @@
 //Simple Serial IO Driver
 //Takes serial commands to control configured IO.
 //Reports IO status created for use with OctoPrint_SIOControl_plugin
+
+#define ENABLE_WIFI_SUPPORT
 #include <Bounce2.h>
 #include "FS.h"
 #include <ArduinoJson.h> 
@@ -8,7 +10,7 @@
 #include "global.h"
 #define _GDebug 
 #define USE_DIGESTAUTH
-#define VERSIONINFO "SIO_ESP12F_Relay_X2 1.0.6"
+#define VERSIONINFO "SIO_ESP12F_Relay_X2 1.0.7"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #define DEFAULT_HOSTS_NAME "SIOControler-New"
 #include "TimeRelease.h"
@@ -87,13 +89,18 @@ void setup() {
   ReadyForCommands.set(reportInterval); //Initial short delay resets will be at 3x
   DisplayIOTypeConstants();
 
-
-  //debugMsg("Disabling Wifi");
-  //WiFi.mode(WIFI_OFF);    //The entire point of this project is to not use wifi but have directly connected IO for use with the OctoPrint PlugIn and subPlugIn
+  #ifdef ENABLE_WIFI_SUPPORT
   SetupWifi();
   if(_debug){
     DebugwifiConfig();
   }
+  #else
+  debugMsg("Disabling Wifi");
+  WiFi.mode(WIFI_OFF);    //The entire point of this project is to not use wifi but have directly connected IO for use with the OctoPrint PlugIn and subPlugIn
+  #endif
+  
+  
+  
   if(!loadSettings()){
     #ifdef _debug
     Serial.println("Settings Config Loaded");
@@ -125,8 +132,9 @@ void loop() {
       ReadyForCommands.set(reportInterval *3);
     }
   }
+  #ifdef ENABLE_WIFI_SUPPORT
   CheckWifi();
-  
+  #endif 
   
 }
 //*********************End loop***************************//
@@ -336,6 +344,7 @@ void checkSerial(){
       return; 
     }
     
+    #ifdef ENABLE_WIFI_SUPPORT
     else if(command == "WF"){
       
       if(value == "netstat"){ack();PrintNetStat();}
@@ -395,6 +404,7 @@ void checkSerial(){
         loadwifiConfig();
       }
     }
+    #endif //ENABLE_WIFI_SUPPORT
     else{
       debugMsg("ERROR: Unrecognized command["+command+"]");
     }
