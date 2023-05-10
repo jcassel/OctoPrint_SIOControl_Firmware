@@ -9,7 +9,12 @@ TimeRelease resetTimeDelay;
 
 
 uint32_t getChipId(){
-  return ESP.getChipId();
+  uint32_t chipId = 0;
+  for(int i=0; i<17; i=i+8) {
+    chipId |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
+  }
+  
+  return chipId;
 }
 
 WiFiUDP ntpUDP;
@@ -41,7 +46,7 @@ struct SettingsConfig
 SettingsConfig settingsConfig;
 WifiConfig wifiConfig;
 char* www_username = "admin";
-ESP8266WebServer webServer(80);
+WebServer webServer(80);
 int lastWifiStatus = -1;
 
 
@@ -151,11 +156,10 @@ void DoInAPMode(){
 void CheckWifi(){
    //check connection status
   if(!InAPMode || InAPMode && !APModeSuccess){
+    
     if(!isWiFiConnected()){
       InAPMode = true; 
       DoInAPMode();
-    }else{ //service requests
-      webServer.handleClient();
     }
     
   }else{
@@ -163,9 +167,12 @@ void CheckWifi(){
     if(ReconnectWiFi.check() && WiFi.softAPgetStationNum() ==0){
         InAPMode = !startWifiStation(); //attempt to reconnect to the main wifi access point if it succeds, Set to false.
         APModeSuccess = false; //reset so it will do a full attempt to go into AP mode if called to
+    }else{
+      
     }
   }
   
+  webServer.handleClient(); 
   
   if(resetTimeDelay.check()){
     if(needReset){

@@ -1,0 +1,35 @@
+<!DOCTYPE HTML><html><head><title>SIO Control IO Configuration</title>
+<link rel="stylesheet" type="text/css" href="/style.css"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"></head>
+	<body>
+		<div id="loader" class="lds-dual-ring overlay hidden"></div>
+		<div id="action" class="normal hidden" ></div>
+		<div id="gcontainer" class="grid-container hidden">
+		  <div class="header"><span id="deviceInfo" >...</span></div>
+		  <div class="menu">	
+			<ul class="topnav">
+			  <li><a href="/config">Configuration</a></li>
+			  <li><a class="active" href="/ioconfig">IO Config</a></li>
+			  <!--<li><a href="/spiffs">File Upload</a></li>
+			  <li class="right"><a href="/update">Update Firmware</a></li>-->
+			</ul>
+		  </div>
+		  
+		  <div  id="main" class="main ">
+			<form id="frm" class="frm" method='POST' action='/ioconfig'>
+			<table border="1" id="ioPoints" ></table>		
+			<h4><div><input type='submit' name='update' value='Update'/> </div></h4>
+			<h4><div><input type='submit' name='reboot' value='Reboot'/> </div></h4>
+			<h4>Status:<span id="status"></span></h4>
+			</form>
+		  </div>  
+		  <div class="footer"><span id="firmwareV"></span></div>
+		</div>
+		<script>
+			var domReady = function(callback) {
+					document.readyState === "interactive" || document.readyState === "complete" ? callback() : document.addEventListener("DOMContentLoaded", callback);
+			};
+		</script>
+		<script type="application/javascript" src="ioconfig.js"></script>  
+  	</body>
+</html>

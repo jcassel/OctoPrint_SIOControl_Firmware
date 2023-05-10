@@ -1,58 +1,29 @@
 //Simple Serial IO Driver
 //Takes serial commands to control configured IO.
 //Reports IO status created for use with OctoPrint_SIOControl_plugin
+#define ENABLE_WIFI_SUPPORT
 
-#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.0.5"
+#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.0.7"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
+#define DEFAULT_HOSTS_NAME "SIOControler-New"
+
 #include "TimeRelease.h"
-#include <ArduinoJson.h> 
+#include <ArduinoJson.h>  //v
 #include <SPIFFS.h>   // Filesystem support header
+#include <Bounce2.h>
 #include "FS.h"
+#include "global.h"
+
 #define FS_NO_GLOBALS
 #include <WiFi.h>
-#include <Bounce2.h>
+#include <WebServer.h>
+#include <NTPClient.h>
+#include <Time.h>        
+#include <TimeLib.h>
 
 
-//note that there are some IO points that are not optimal to use as basic IO points. There state at start up of the 
-//device migh cause issue where the device could go into programing mode or the IO pin might be pulsed on startup. 
-//These pins on the Esp32wroom module are 0,1,3,5, and 12. 
-//GPIO 0 outputs a PWM Signal at boot and will cause the module to go into programming mode if it is pulled low on boot. 
-//GPIO 1 is the TX pin and will output debug data on boot.
-//GPIO 3 is the RX pin and will go high on boot. 
-//GPIO 5 outputs a PWM Signal at boot, is a strapping pin
-//GPIO 12 boot will fail if it is pulled High during a boot, is a strapping pin
-//These iopoints are used for SPI Flash (6,7,8,9,10,11) so they also should not be used by user code. 
-//GPIO 14 outputs a PWM Signal at boot, is a strapping pin
-//GPIO 15 outputs a PWM Signal at boot.
-//Additionally IO 34,35,36,and39 can only be used as inputs.
-//reference: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
-
-
-#define IO0 34//  input only (Must configure (in code)without pullup or down. These inputs do not have these on chip)
-#define IO1 35//  input only  (Must configure (in code)without pullup or down. These inputs do not have these on chip)
-#define IO2 36//  input only (Labeled as SVP)  (Must configure (in code)without pullup or down. These inputs do not have these on chip)
-#define IO3 39//  input only (Labeled as SVN)  (Must configure (in code)without pullup or down. These inputs do not have these on chip)
-#define IO4 0//  general IO  Important note.. if this is in a low state on boot of the device, it will go into programing mode. 
-#define IO5 5//  general IO
-#define IO6 12//  general IO
-#define IO7 13//  general IO
-#define IO8 14//  general IO
-#define IO9 33//  general IO
-#define IO10 25//  general IO
-#define IO11 16 // Relay1
-#define IO12 17//  Relay2
-#define IO13 23//  output has the board built in LED attached. Active LOW.
-
-
-
-#define IOSize  14 //number should be one more than the IO# :) (must include the idea of Zero) 
-bool _debug = false;
-int IOType[IOSize]{INPUT,INPUT,INPUT,INPUT,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,OUTPUT,OUTPUT,OUTPUT};
-int IOMap[IOSize] {IO0,IO1,IO2,IO3,IO4,IO5,IO6,IO7,IO8,IO9,IO10,IO11,IO12,IO13};
-String IOSMap[IOSize] {"IO0","IO1","IO2","IO3","IO4","IO5","IO6","IO7","IO8","IO9","IO10","IO11","IO12","IO13"};
-int IO[IOSize];
-Bounce Bnc[IOSize];
-bool EventTriggeringEnabled = 1;
+#include "wifiCommon.h"
+#include "webPages.h"
 
 
 bool isOutPut(int IOP){
@@ -79,11 +50,7 @@ void ConfigIO(){
 
 TimeRelease IOReport;
 TimeRelease ReadyForCommands;
-
-
 unsigned long reportInterval = 3000;
-
-
 
 
 void setup() {
@@ -91,8 +58,7 @@ void setup() {
   Serial.begin(115200);
   delay(300);
   debugMsg(VERSIONINFO);
-  debugMsg("Disabling Wifi");
-  WiFi.mode(WIFI_OFF);    //The entire point of this project is to not use wifi but have directly connected IO for use with the OctoPrint PlugIn and subPlugIn
+  
   debugMsg("Start Types");
   InitStorageSetup();
   loadIOConfig();
@@ -110,6 +76,31 @@ void setup() {
   IOReport.set(100ul);
   ReadyForCommands.set(reportInterval); //Initial short delay resets will be at 3x
   DisplayIOTypeConstants();
+
+  #ifdef ENABLE_WIFI_SUPPORT
+  SetupWifi();
+  if(_debug){
+    DebugwifiConfig();
+  }
+  #else
+  debugMsg("Disabling Wifi");
+  WiFi.mode(WIFI_OFF);    //The entire point of this project is to not use wifi but have directly connected IO for use with the OctoPrint PlugIn and subPlugIn
+  #endif
+
+ if(!loadSettings()){
+    #ifdef _debug
+    Serial.println("Settings Config Loaded");
+    #endif
+  }
+
+  #ifdef ENABLE_WIFI_SUPPORT
+  debugMsg("begin init pages");
+  initialisePages();
+  debugMsg("end init pages");
+  webServer.begin();
+  debugMsg("end webserver.begin");
+  #endif
+  
 }
 
 
@@ -128,6 +119,9 @@ void loop() {
       ReadyForCommands.set(reportInterval *3);
     }
   }
+  #ifdef ENABLE_WIFI_SUPPORT
+  CheckWifi();
+  #endif 
   
 }
 //*********************End loop***************************//
@@ -343,6 +337,72 @@ void checkSerial(){
       reportIO(true);
       return; 
     }
+    
+    #ifdef ENABLE_WIFI_SUPPORT
+    else if(command == "WF"){
+      
+      if(value == "netstat"){ack();PrintNetStat();}
+      if(value == "filelist"){
+        ack();
+        //list files in SPIFF
+      }
+      if(value.startsWith("set")){
+        ack();
+        WifiConfig wfconfig;
+        
+        //wfconfig.ssid = wifiConfig.ssid;
+        strlcpy(wfconfig.ssid, wifiConfig.ssid, sizeof(wfconfig.ssid));
+        //wfconfig.password = wifiConfig.password;
+        strlcpy(wfconfig.password, wifiConfig.password, sizeof(wfconfig.password));
+        //wfconfig.wifimode = wifiConfig.wifimode;
+        strlcpy(wfconfig.wifimode, wifiConfig.wifimode, sizeof(wfconfig.wifimode));
+        //wfconfig.hostname = wifiConfig.hostname;
+        strlcpy(wfconfig.hostname, wifiConfig.hostname, sizeof(wfconfig.hostname));
+        wfconfig.attempts = wifiConfig.attempts;
+        wfconfig.attemptdelay = wifiConfig.attemptdelay;
+        //wfconfig.apPassword = wifiConfig.apPassword;
+        strlcpy(wfconfig.apPassword, wifiConfig.apPassword, sizeof(wfconfig.apPassword));
+        String nameValuePare = value.substring(value.indexOf(" ")+1);
+        String setting = nameValuePare.substring(0,nameValuePare.indexOf(" "));
+        String newValue = nameValuePare.substring(nameValuePare.indexOf(" ")+1);
+        if(_debug){
+        Serial.print("Wifi Setting entered:");Serial.println(setting);
+        Serial.print("Wifi value entered:");Serial.println(newValue);
+        }
+        if(setting == "ssid"){
+          //wfconfig.ssid = newValue;
+          strlcpy(wfconfig.ssid, newValue.c_str(), sizeof(wfconfig.ssid));
+        }else if (setting == "password"){
+          //wfconfig.password = newValue;
+          strlcpy(wfconfig.password, newValue.c_str(), sizeof(wfconfig.password));
+        }else if (setting == "hostname"){
+          //wfconfig.hostname = newValue;
+          strlcpy(wfconfig.hostname, newValue.c_str(), sizeof(wfconfig.hostname));
+        }else if (setting == "attempts"){
+          wfconfig.attempts = newValue.toInt();
+        }else if (setting == "attemptdelay"){
+          wfconfig.attemptdelay = newValue.toInt();
+        }else if (setting == "apPassword"){
+          //wfconfig.apPassword = newValue;
+          strlcpy(wfconfig.apPassword, newValue.c_str(), sizeof(wfconfig.apPassword));
+        }else if (setting == "wifimode"){
+          // WIFI_AP or WIFI_STA
+          if(newValue == "STA"){
+            //wfconfig.wifimode = "WIFI_STA";
+            strlcpy(wfconfig.wifimode, "WIFI_STA", sizeof(wfconfig.wifimode));
+          }else if(newValue == "AP"){
+            //wfconfig.wifimode = "WIFI_AP";
+            strlcpy(wfconfig.wifimode, "WIFI_AP", sizeof(wfconfig.wifimode));
+          }
+        }
+        if(_debug){
+          debugMsg("saving updates to wifiConfig");
+        }
+        savewifiConfig(wfconfig);
+        loadwifiConfig();
+      }
+    }
+    #endif //ENABLE_WIFI_SUPPORT
     else{
       debugMsg("ERROR: Unrecognized command["+command+"]");
     }
@@ -377,17 +437,6 @@ bool validateNewIOConfig(String ioConfig){
   return true; //seems its a good set of point Types.
 }
 
-void updateIOConfig(String newIOConfig){
-  for (int i=2;i<IOSize;i++){//start at 2 to avoid D0 and D1
-    int nIOC = newIOConfig.substring(i,i+1).toInt();
-    if(IOType[i] != nIOC){
-      IOType[i] = nIOC;
-      if(nIOC == OUTPUT){
-        digitalWrite(IOMap[i],LOW); //set outputs to low since they will be high coming from INPUT_PULLUP
-      }
-    }
-  }
-}
 
 int getIOType(String typeName){
   if(typeName == "INPUT"){return 1;}
@@ -452,36 +501,7 @@ if (!SPIFFS.exists("/IOConfig.json"))
 }
 
 
-bool StoreIOConfig(){
-  SPIFFS.remove("/IOConfig.json");
-  File file = SPIFFS.open("/IOConfig.json", "w");
-  if(_debug){debugMsg("saving IO Config");}
-  DynamicJsonDocument doc(2048);
 
-  JsonObject configObj = doc.to<JsonObject>();
-
-  for (int i=0;i<IOSize;i++){
-    configObj[IOSMap[i]]= getIOTypeString(IOType[i]);
-  }
-  
-  
-  if(_debug){
-    debugMsg("Saved IO as json: ");    
-    String jsonConfig;
-    serializeJson(configObj, jsonConfig); 
-    debugMsg(jsonConfig);
-  }
-    
-  
-  if (serializeJsonPretty(doc, file) == 0)
-  {
-    debugMsg("[WARNING]: Failed to write to file:/IOConfig.json");
-    return false;
-  }
-  file.close();
-  if(_debug){debugMsg("Saved IO Config");}
-  return true;
-}
 
 
 
@@ -506,31 +526,12 @@ bool IsSpaceLeft()
   return true;
 }
 
-String getIOTypeString(int ioType){
-  if (ioType == 1){return "INPUT";}
-  if (ioType == 2){return "OUTPUT";}
-  if (ioType == 5){return "INPUT_PULLUP";}
-  if (ioType == 9){return "INPUT_PULLDOWN";}
-  if (ioType == 18){return "OUTPUT_OPEN_DRAIN";}
-}
 
 #define FORMAT_SPIFFS_IF_FAILED true
+
 void InitStorageSetup(){
    if(!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)){
       debugMsg("Warning SPIFFS Mount Failed (Attempt Restart if this is the first time this firmware was loaded.)");
       return;
    }
-
-  
-  //SPIFFS.begin();
-  //do anything that might be needed related to file and storage on startup.
-}
-
-void debugMsg(String msg){
-  debugMsgPrefx();
-  Serial.println(msg);
-}
-
-void debugMsgPrefx(){
-  Serial.print("DG:");
 }

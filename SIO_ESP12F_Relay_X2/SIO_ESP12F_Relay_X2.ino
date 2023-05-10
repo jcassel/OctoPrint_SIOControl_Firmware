@@ -107,12 +107,13 @@ void setup() {
     #endif
   }
   
+  #ifdef ENABLE_WIFI_SUPPORT
   debugMsg("begin init pages");
   initialisePages();
   debugMsg("end init pages");
   webServer.begin();
   debugMsg("end webserver.begin");
-
+  #endif
   
 }
 
