@@ -83,7 +83,7 @@ bool startWifiStation(){
         WiFi.mode(WIFI_STA);
         WiFi.begin(wifiConfig.ssid, wifiConfig.password);
         WifiInitialized = true;
-        uint8_t attempts = wifiConfig.attempts;
+        int attempts = wifiConfig.attempts;
         while (!isWiFiConnected())
         {
           if(attempts == 0) {
@@ -125,28 +125,26 @@ bool startWifiStation(){
 void DoInAPMode(){
   if(InAPMode && !APModeSuccess){
     //Going into AP mode
-    #ifdef _GDebug
-    Serial.println("Entering AP mode.");
-    #endif
-    if(wifiConfig.hostname == DEFAULT_HOSTS_NAME){
-      String tempName = wifiConfig.hostname + String(getChipId()); 
-      strlcpy(wifiConfig.hostname,tempName.c_str(),sizeof(wifiConfig.hostname));
-    }
+    
+    debugMsg("Entering AP mode.");
+    
+    
+    String tempName = wifiConfig.hostname + String(getChipId()); 
+    strlcpy(wifiConfig.hostname,tempName.c_str(),sizeof(wifiConfig.hostname));
+    
     WiFi.disconnect();
     WiFi.mode(WIFI_AP);
     delay(100);
     APModeSuccess = WiFi.softAP(wifiConfig.hostname, wifiConfig.apPassword);
+    
     if (APModeSuccess){
-      #ifdef _GDebug
-      Serial.print("SoftAP IP Address: ");
-      Serial.println(WiFi.softAPIP());
-      #endif
-      ReconnectWiFi.set(15000); //15 seconds
+      debugMsgPrefx();Serial.print("SoftAP IP Address: ");Serial.println(WiFi.softAPIP());
+      ReconnectWiFi.set(75000); //75 seconds unless someone connects.
     }else{
       APModeSuccess = true; // not really but if we do not do this, It will come though here and reset the reset delay every loop. 
-      #ifdef _GDebug
-      Serial.println("SoftAP mode Failed Rebooting in 15 seconds.");
-      #endif
+      
+      debugMsg("SoftAP mode Failed Rebooting in 15 seconds.Try using Serial connection to update WiFi settings.");
+      
       resetTimeDelay.set(15000UL); //trigger 15 sec
       needReset = true;
     }
@@ -155,20 +153,14 @@ void DoInAPMode(){
 
 void CheckWifi(){
    //check connection status
-  if(!InAPMode || InAPMode && !APModeSuccess){
-    
-    if(!isWiFiConnected()){
-      InAPMode = true; 
+   
+  if(InAPMode && !APModeSuccess){
       DoInAPMode();
-    }
-    
   }else{
     //only try to reconnect if no one has connected as an AP client.
     if(ReconnectWiFi.check() && WiFi.softAPgetStationNum() ==0){
         InAPMode = !startWifiStation(); //attempt to reconnect to the main wifi access point if it succeds, Set to false.
         APModeSuccess = false; //reset so it will do a full attempt to go into AP mode if called to
-    }else{
-      
     }
   }
   
@@ -219,7 +211,7 @@ bool loadwifiConfig()
     #ifdef _GDebug
     Serial.println("[WARNING]: wifiConfig file not found! Loading Factory Defaults.");
     #endif
-    strlcpy(wifiConfig.ssid,"unset", sizeof(wifiConfig.ssid));
+    strlcpy(wifiConfig.ssid,"", sizeof(wifiConfig.ssid));
     strlcpy(wifiConfig.password, "", sizeof(wifiConfig.password));
     
     strlcpy(wifiConfig.wifimode, "WIFI_AP", sizeof(wifiConfig.wifimode));
@@ -242,10 +234,10 @@ bool loadwifiConfig()
   strlcpy(wifiConfig.hostname, doc["hostname"] | DEFAULT_HOSTS_NAME, sizeof(wifiConfig.hostname));
   strlcpy(wifiConfig.apPassword, doc["apPassword"] | "Password1", sizeof(wifiConfig.apPassword));
 
-  uint8_t attempts = doc["attempts"] | 10 ;
+  int attempts = doc["attempts"] | 10 ;
   wifiConfig.attempts = attempts;
 
-  uint16_t attemptdelay = doc["attemptdelay"] | 5000 ;
+  int attemptdelay = doc["attemptdelay"] | 5000 ;
   wifiConfig.attemptdelay = attemptdelay;
 
   configfile.close();
@@ -310,7 +302,15 @@ void SetupWifi(){
     #ifdef _GDebug
     Serial.println("WiFi Config Loaded");
     #endif
-    InAPMode  = false;
+    Serial.print("WifiMode:");
+    Serial.println(wifiConfig.wifimode);
+    if(wifiConfig.wifimode == "WIFI_AP"){
+      InAPMode  = true;
+      
+    }else{
+      InAPMode  = false;
+    }
+      
   }else{
     #ifdef _GDebug
     Serial.println("WiFi Config Failed to Load");
@@ -318,8 +318,10 @@ void SetupWifi(){
     InAPMode  = true;
   }
   if(InAPMode){
+    debugMsg("Doing InAPMode");
     DoInAPMode();
   }else{
+    debugMsg("Doing startWifiStation");
     startWifiStation();
   }
   #ifdef _GDebug
@@ -389,15 +391,17 @@ bool loadSettings(){
 
   strlcpy(settingsConfig.OPURI, doc["OPURI"] | "FAILED", sizeof(settingsConfig.OPURI));
   
-  uint8_t OPPort = doc["OPPort"] | 5000 ;
+  int OPPort = doc["OPPort"] | 5000 ;
+  
   settingsConfig.OPPort = OPPort;
+  
   
   strlcpy(settingsConfig.OPAK, doc["OPAK"] | "FAILED", sizeof(settingsConfig.OPAK));
 
-  uint8_t StatusIntervalSec = doc["StatusIntervalSec"] | 15 ;
+  int StatusIntervalSec = doc["StatusIntervalSec"] | 15 ;
   settingsConfig.StatusIntervalSec = StatusIntervalSec;
 
-  uint8_t TimeZoneOffsetHours = doc["TimeZoneOffsetHours"] | -5 ;
+  int TimeZoneOffsetHours = doc["TimeZoneOffsetHours"] | -5 ;
   settingsConfig.TimeZoneOffsetHours = TimeZoneOffsetHours;
 
   configfile.close();
@@ -443,11 +447,11 @@ bool saveSettings(SettingsConfig newSettings){
     return false;
   }else {
     settingsConfig = newSettings;
-    #ifdef _GDebug
+    
     Serial.print("Characters witten: ");Serial.println(chrW);
     Serial.println("settingsConfig was updated");
     DebugSettingsConfig();
-    #endif
+    
   }
     
   file.close();

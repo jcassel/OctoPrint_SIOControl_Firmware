@@ -326,6 +326,53 @@ void initialisePages(){
     #endif
     
   });
+  webServer.on("/ioControl/status",HTTP_GET,[]{
+    if(!checkAuth()){return;}
+
+    String ioData = "{\"IO\":{";
+    ioData += "\"io0\":\"" + String(IO[0]) + "\""; //initial item (no comma)      
+    for (int i=1;i<IOSize;i++){
+      ioData += ",\"io" +String(i) +"\":\"" + String(IO[i]) + "\"";      
+    }
+
+    ioData += "}}";
+    webServer.send(200, "application/json", ioData);
+  });
   
+  webServer.on("/ioControl/update",HTTP_GET,[]{
+    if(!checkAuth()){return;}
+    String response = "{\"OK\":\"";
+      if(webServer.hasArg("IO")){
+          String request = webServer.arg("IO");
+          DynamicJsonDocument doc(256);
+          DeserializationError error = deserializeJson(doc,request);
+          // Test if parsing succeeds.
+          if (error) {
+            String eSt = error.f_str();
+            response += "Error: deserializeJson() failed:";
+            response += error.f_str();
+            debugMsg(response); //serial response 
+          }else{
+            //Example set IO point 12 to a HIGH >>> {"point":[12,1]} >>> http://192.168.4.1/ioControl/update?IO={%22point%22:[12,1]}
+            //Example set IO point 11 to a LOW >>> {"point":[11,0]}
+            int ioPoint = doc["point"][0];
+            int ioValue = doc["point"][1];
+            if(isOutPut(ioPoint)){
+              if(ioValue == 1){
+                digitalWrite(IOMap[ioPoint],HIGH);//Sticking to constants incase there is a change there.
+              }else{
+                digitalWrite(IOMap[ioPoint],LOW);//Sticking to constants incase there is a change there.
+              }
+              response += "Success\"";
+            }else{
+              response += "Error: Attempt to set IO which is not an output\"";
+              debugMsg(response);   
+            }
+          }
+          response += "}";
+          webServer.send(200, "application/json", response);
+          
+      }
+  });
   
 }

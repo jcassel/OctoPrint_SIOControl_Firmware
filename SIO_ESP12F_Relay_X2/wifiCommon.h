@@ -151,11 +151,12 @@ void DoInAPMode(){
 void CheckWifi(){
    //check connection status
   if(!InAPMode || InAPMode && !APModeSuccess){
+    
     if(!isWiFiConnected()){
       InAPMode = true; 
       DoInAPMode();
-    }else{ //service requests
-      webServer.handleClient();
+							 
+							   
     }
     
   }else{
@@ -163,9 +164,12 @@ void CheckWifi(){
     if(ReconnectWiFi.check() && WiFi.softAPgetStationNum() ==0){
         InAPMode = !startWifiStation(); //attempt to reconnect to the main wifi access point if it succeds, Set to false.
         APModeSuccess = false; //reset so it will do a full attempt to go into AP mode if called to
+    }else{
+      
     }
   }
   
+  webServer.handleClient(); 
   
   if(resetTimeDelay.check()){
     if(needReset){
@@ -212,7 +216,7 @@ bool loadwifiConfig()
     #ifdef _GDebug
     Serial.println("[WARNING]: wifiConfig file not found! Loading Factory Defaults.");
     #endif
-    strlcpy(wifiConfig.ssid,"unset", sizeof(wifiConfig.ssid));
+    strlcpy(wifiConfig.ssid,"", sizeof(wifiConfig.ssid));
     strlcpy(wifiConfig.password, "", sizeof(wifiConfig.password));
     
     strlcpy(wifiConfig.wifimode, "WIFI_AP", sizeof(wifiConfig.wifimode));
@@ -235,10 +239,10 @@ bool loadwifiConfig()
   strlcpy(wifiConfig.hostname, doc["hostname"] | DEFAULT_HOSTS_NAME, sizeof(wifiConfig.hostname));
   strlcpy(wifiConfig.apPassword, doc["apPassword"] | "Password1", sizeof(wifiConfig.apPassword));
 
-  uint8_t attempts = doc["attempts"] | 10 ;
+  int attempts = doc["attempts"] | 10 ;
   wifiConfig.attempts = attempts;
 
-  uint16_t attemptdelay = doc["attemptdelay"] | 5000 ;
+  int attemptdelay = doc["attemptdelay"] | 5000 ;
   wifiConfig.attemptdelay = attemptdelay;
 
   configfile.close();
@@ -382,15 +386,15 @@ bool loadSettings(){
 
   strlcpy(settingsConfig.OPURI, doc["OPURI"] | "FAILED", sizeof(settingsConfig.OPURI));
   
-  uint8_t OPPort = doc["OPPort"] | 5000 ;
+  int OPPort = doc["OPPort"] | 5000 ;
   settingsConfig.OPPort = OPPort;
   
   strlcpy(settingsConfig.OPAK, doc["OPAK"] | "FAILED", sizeof(settingsConfig.OPAK));
 
-  uint8_t StatusIntervalSec = doc["StatusIntervalSec"] | 15 ;
+  int StatusIntervalSec = doc["StatusIntervalSec"] | 15 ;
   settingsConfig.StatusIntervalSec = StatusIntervalSec;
 
-  uint8_t TimeZoneOffsetHours = doc["TimeZoneOffsetHours"] | -5 ;
+  int TimeZoneOffsetHours = doc["TimeZoneOffsetHours"] | -5 ;
   settingsConfig.TimeZoneOffsetHours = TimeZoneOffsetHours;
 
   configfile.close();

@@ -3,12 +3,12 @@
 //Reports IO status created for use with OctoPrint_SIOControl_plugin
 #define ENABLE_WIFI_SUPPORT
 
-#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.0.7"
+#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.0.8"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #define DEFAULT_HOSTS_NAME "SIOControler-New"
 
 #include "TimeRelease.h"
-#include <ArduinoJson.h>  //v
+#include <ArduinoJson.h>  
 #include <SPIFFS.h>   // Filesystem support header
 #include <Bounce2.h>
 #include "FS.h"
@@ -26,9 +26,6 @@
 #include "webPages.h"
 
 
-bool isOutPut(int IOP){
-  return (IOType[IOP] == OUTPUT);
-}
 
 void ConfigIO(){
   
@@ -58,41 +55,55 @@ void setup() {
   Serial.begin(115200);
   delay(300);
   debugMsg(VERSIONINFO);
-  
+
+   
   debugMsg("Start Types");
   InitStorageSetup();
   loadIOConfig();
   debugMsg("Initializing IO");
   ConfigIO();
+
+
   
   reportIOTypes();
   debugMsg("End Types");
 
   //need to get a baseline state for the inputs and outputs.
   for (int i=0;i<IOSize;i++){
-    IO[i] = digitalRead(IOMap[i]);  
+    IO[i] = digitalRead(IOMap[i]);
+    debugMsgPrefx();Serial.print("IO[");
+    Serial.print(i);
+    Serial.print("]: ");
+    Serial.println(IO[i]);  
   }
+
+  
   
   IOReport.set(100ul);
   ReadyForCommands.set(reportInterval); //Initial short delay resets will be at 3x
   DisplayIOTypeConstants();
 
   #ifdef ENABLE_WIFI_SUPPORT
-  SetupWifi();
-  if(_debug){
-    DebugwifiConfig();
-  }
+    SetupWifi();
+    if(_debug){
+      DebugwifiConfig();
+    }
   #else
-  debugMsg("Disabling Wifi");
-  WiFi.mode(WIFI_OFF);    //The entire point of this project is to not use wifi but have directly connected IO for use with the OctoPrint PlugIn and subPlugIn
+    debugMsg("Disabling Wifi");
+    WiFi.mode(WIFI_OFF);    //The entire point of this project is to not use wifi but have directly connected IO for use with the OctoPrint PlugIn and subPlugIn
   #endif
 
  if(!loadSettings()){
-    #ifdef _debug
-    Serial.println("Settings Config Loaded");
-    #endif
+    if(_debug){
+      debugMsg("Settings failed to load");
+    }
+  }else{
+    if(_debug){
+      debugMsg("Settings loaded from filesystem.");
+      DebugSettingsConfig();
+    }
   }
-
+  
   #ifdef ENABLE_WIFI_SUPPORT
   debugMsg("begin init pages");
   initialisePages();
@@ -146,16 +157,14 @@ bool checkIO(){
   
   for (int i=0;i<IOSize;i++){
     if(!isOutPut(i)){
-      if(_debug){debugMsgPrefx();Serial.print("NOT Output IO#:");Serial.println(i);}
       Bnc[i].update();
-      
       if(Bnc[i].changed()){
        changed = true;
        IO[i]=Bnc[i].read();
        if(_debug){debugMsg("Input Changed: "+String(i));}
       }
     }else{
-      //debugMsgPrefx();Serial.print("IS Output IO#:");Serial.println(i);
+      
       //is the current state of this output not the same as it was on last report.
       //this really should not happen if the only way an output can be changed is through Serial commands.
       //the serial commands force a report after it takes action.
@@ -327,6 +336,7 @@ void checkSerial(){
       return;
     }
     else if (command == "restart" || command == "reset" || command == "reboot"){
+      ack();
       debugMsg("[WARNING]: Restarting device");
       ESP.restart();
     }

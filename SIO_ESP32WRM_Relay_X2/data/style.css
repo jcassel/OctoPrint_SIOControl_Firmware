@@ -26,6 +26,7 @@ td,th{text-align:left;padding:8px}
 th{background-color:#8e96a3}
 tr:nth-child(even){background-color:#f2f2f2}
 input[type=text]{box-sizing:border-box;border:1px solid #ccc;border-radius:4px;font-size:15px;background-color:#fff;padding:1px 1px 1px 1px;transition:width .4s ease-in-out;min-width:250px;width:350px}
+input[type=password]{box-sizing:border-box;border:1px solid #ccc;border-radius:4px;font-size:15px;background-color:#fff;padding:1px 1px 1px 1px;transition:width .4s ease-in-out;min-width:250px;width:350px}
 input[type=text]:focus{font-size:16px}
 button,input[type=button],input[type=reset],input[type=submit]{border:none;padding:5px 5px;text-decoration:none;margin:2px 4px;border-radius:6px}
 	
@@ -118,5 +119,5 @@ h3{font-weight:700;font-size:1em;margin-top:2px;margin-bottom: 2px;}
 	}
 }
 
-.isServo {display:block;}
+
  

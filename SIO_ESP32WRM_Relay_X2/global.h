@@ -51,6 +51,9 @@ void debugMsg(String msg){
   Serial.println(msg);
 }
 
+bool isOutPut(int IOP){
+  return (IOType[IOP] == OUTPUT);
+}
 
 
 

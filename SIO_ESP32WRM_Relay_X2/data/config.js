@@ -9,6 +9,23 @@ document.getElementById("action").classList.remove('hidden');
 GetSettings();
 });
 
+function toggleAccessPassword(){
+	var el = document.getElementById("tx_APW");
+	togglePassword(el);
+}
+function toggleWiFiPassword(){
+	var el = document.getElementById("tx_WFPW");
+	togglePassword(el);
+}
+function togglePassword(el){
+	
+	if(el.type === "text"){
+		el.type = "password";
+	}else{
+		el.type = "text";
+	}
+}
+
 function GetSettings(){
 	
 	var xmlhttp = new XMLHttpRequest();

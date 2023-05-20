@@ -10,7 +10,7 @@
 #include "global.h"
 #define _GDebug 
 #define USE_DIGESTAUTH
-#define VERSIONINFO "SIO_ESP12F_Relay_X2 1.0.7"
+#define VERSIONINFO "SIO_ESP12F_Relay_X2 1.0.8"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #define DEFAULT_HOSTS_NAME "SIOControler-New"
 #include "TimeRelease.h"
@@ -29,10 +29,6 @@
 #include "webPages.h"
 
 
-
-bool isOutPut(int IOP){
-  return IOType[IOP] == OUTPUT; 
-}
 
 void ConfigIO(){
   
@@ -102,9 +98,14 @@ void setup() {
   
   
   if(!loadSettings()){
-    #ifdef _debug
-    Serial.println("Settings Config Loaded");
-    #endif
+    if(_debug){
+      Serial.println("Settings failed to load");
+    }
+  }else{
+    if(_debug){
+      Serial.println("Settings loaded from filesystem.");
+      DebugSettingsConfig();
+    }
   }
   
   #ifdef ENABLE_WIFI_SUPPORT
@@ -144,9 +145,9 @@ void reportIO(bool forceReport){
   if (IOReport.check()||forceReport){
     Serial.print("IO:");
     for (int i=0;i<IOSize;i++){
-      if(IOType[i] == 1 ){ //if it is an output
+      //if(IOType[i] == 1 ){ //if it is an output
         IO[i] = digitalRead(IOMap[i]);  
-      }
+      //}
       Serial.print(IO[i]);
     }
     Serial.println();
@@ -184,7 +185,8 @@ bool checkIO(){
 void reportIOTypes(){
   Serial.print("IT:");
   for (int i=0;i<IOSize;i++){
-    Serial.print(IOType[i]);
+    Serial.print(String(IOType[i]));
+    Serial.print(",");
     //if(i<IOSize-1){Serial.print(";");}
   }
   Serial.println();
