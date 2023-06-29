@@ -2,7 +2,7 @@
 //Takes serial commands to control configured IO.
 //Reports IO status created for use with OctoPrint_SIOControl_plugin
 
-#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.0.5"
+#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.0.6"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #include "TimeRelease.h"
 #include <ArduinoJson.h> 
@@ -201,14 +201,14 @@ void DisplayIOTypeConstants(){
 void checkSerial(){
   if (Serial.available()){
     
-    String buf = Serial.readStringUntil('\n');
+      String buf = Serial.readStringUntil('\n');
     buf.trim();
     if(_debug){debugMsg("buf:" + buf);}
     int sepPos = buf.indexOf(" ");
     String command ="";
     String value = "";
     
-    if(sepPos){
+    if(sepPos != -1){
       command = buf.substring(0,sepPos);
       value = buf.substring(sepPos+1);;
       if(_debug){
@@ -221,6 +221,7 @@ void checkSerial(){
         debugMsg("command:[" + command + "]");
       }
     }
+    
     if(command.startsWith("N") || command == "M115"){
       ack();
       Serial.println("Recieved a command that looks like OctoPrint thinks I am a printer.");
@@ -252,7 +253,7 @@ void checkSerial(){
       return;
     }
     
-    else if(command =="debug"){
+    else if(command =="debug" && value.length() == 1){
       ack();
       if(value == "1"){
         _debug = true;
@@ -263,14 +264,15 @@ void checkSerial(){
       }
       return;
     }
-    else if(command=="CIO"){ //set IO Configuration
+    else if(command=="CIO"){
       ack();
-      if (validateNewIOConfig(value)){
+      if(value.length() == 0){ //set IO Configuration
+        debugMsg("ERROR: command value out of range");
+      }else if (validateNewIOConfig(value)){
         updateIOConfig(value);
       }
       return;
     }
-    
     else if(command=="SIO"){
       ack();
       StoreIOConfig();
@@ -283,53 +285,75 @@ void checkSerial(){
     }
     
     //Set IO point high or low (only applies to IO set to output)
-    else if(command =="IO" && value.length() > 0){
+    else if(command =="IO"){ 
       ack();
-      int IOPoint = value.substring(0,value.indexOf(" ")).toInt();
-      int IOSet = value.substring(value.indexOf(" ")+1).toInt();
-      if(_debug){
-        debugMsg("IO#:"+ String(IOMap[IOPoint]));
-        debugMsg("Set to:"+ String(IOSet));
+      if(value.length() < 3){
+        debugMsg("ERROR: command value out of range");
+        return;
       }
       
-      if(isOutPut(IOPoint)){
-        if(IOSet == 1){
-          digitalWrite(IOMap[IOPoint],HIGH);
-        }else{
-          digitalWrite(IOMap[IOPoint],LOW);
+      if(value.indexOf(" ") >=1 && value.substring(value.indexOf(" ")+1).length()==1){//is there at least one character for the IO number and the value for this IO point must be only one character (1||0)
+        String sIOPoint = value.substring(0,value.indexOf(" "));
+        String sIOSet = value.substring(value.indexOf(" ")+1); // leaving this as a string allows for easy check on correct posible values
+                 
+        if(_debug){
+          debugMsg("IO#:"+ sIOPoint);
+          debugMsg("GPIO#:"+ String(IOMap[sIOPoint.toInt()]));
+          debugMsg("Set to:"+ sIOSet);
         }
+
+        //checks to see if the IO point is not a number if the string is not a zero but the number is that means it was not a number
+        if(isOutPut(sIOPoint.toInt()) && !(sIOPoint.toInt() == 0 && sIOPoint != "0") ){
+          if(sIOSet == "0" || sIOSet == "1"){// need to make sure it is a valid IO point value 
+            if(sIOSet == "1"){
+              digitalWrite(IOMap[sIOPoint.toInt()],HIGH);
+            }else{
+              digitalWrite(IOMap[sIOPoint.toInt()],LOW);
+            }
+          }else{
+            debugMsg("ERROR: Attempt to set IO to a value that is not valid");   
+          }
+        }else{
+          debugMsg("ERROR: Attempt to set IO which is not an output");   
+        }
+        //delay(200); // give it a moment to finish changing the 
+        reportIO(true);
       }else{
-        debugMsg("ERROR: Attempt to set IO which is not an output");   
+        debugMsg("ERROR: IO point or value is invalid");   
       }
-      //delay(200); // give it a moment to finish changing the 
-      reportIO(true);
       return;
     }
     
     //Set AutoReporting Interval  
-    else if(command =="SI" && value.length() > 0){
+    else if(command =="SI"){ 
       ack();
-      unsigned long newTime = 0;
-      if(strToUnsignedLong(value,newTime)){ //will convert to a full long.
-        if(newTime >=500){
+      if(value.length() > 2){
+        long newTime = value.toInt();
+        if(newTime >=500 && (String(newTime) == value)){
           reportInterval = newTime;
           IOReport.clear();
           IOReport.set(reportInterval);
-          if(_debug){
-            debugMsg("Auto report timing changed to:" +String(reportInterval));
-          }
+          debugMsg("Auto report timing changed to:" +String(reportInterval));
         }else{
-          debugMsg("ERROR: minimum value 500");
+          debugMsg("ERROR: command value out of range: Min(500) Max(2147483647)");
         }
         return;
       }
-      debugMsg("ERROR: bad format number out of range");
+      debugMsg("ERROR: bad format number out of range.(500- 2147483647); actual sent [" + value + "]; Len["+String(value.length())+"]");
       return; 
     }
     //Enable event trigger reporting Mostly used for E-Stop
-    else if(command == "SE" && value.length() > 0){
+    else if(command == "SE"){
       ack();
-      EventTriggeringEnabled = value.toInt();
+      if(value.length() == 1){
+        if(value == "1" || value == "0"){
+          EventTriggeringEnabled = value.toInt();
+        }else{
+          debugMsg("ERROR: command value out of range");
+        }
+      }else{
+        debugMsg("ERROR: command value not sent or bad format");
+      }
       return;
     }
     else if (command == "restart" || command == "reset" || command == "reboot"){
@@ -342,9 +366,6 @@ void checkSerial(){
       ack();
       reportIO(true);
       return; 
-    }
-    else{
-      debugMsg("ERROR: Unrecognized command["+command+"]");
     }
   }
 }
@@ -395,21 +416,6 @@ int getIOType(String typeName){
   if(typeName == "INPUT_PULLUP"){return 5;}
   if(typeName == "INPUT_PULLDOWN"){return 9;}
   if(typeName == "OUTPUT_OPEN_DRAIN"){return 18;} //not sure on this value have to double check
-}
-
-bool strToUnsignedLong(String& data, unsigned long& result) {
-  data.trim();
-  long tempResult = data.toInt();
-  if (String(tempResult) != data) { // check toInt conversion
-    // for very long numbers, will return garbage, non numbers returns 0
-   // Serial.print(F("not a long: ")); Serial.println(data);
-    return false;
-  } else if (tempResult < 0) { //  OK check sign
-   // Serial.print(F("not an unsigned long: ")); Serial.println(data);
-    return false;
-  } //else
-  result = tempResult;
-  return true;
 }
 
 

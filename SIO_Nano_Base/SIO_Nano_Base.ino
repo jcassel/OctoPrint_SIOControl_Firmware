@@ -3,13 +3,19 @@
 //Reports IO status created for use with OctoPrint_SIOControl_plugin
 
 //the nano has very little variable memory this firmware uses a lot of strings for comm.  
-//use includeDebug to ensure that after you have made any changes you have enough memory to be stable. 
+//commentout includeDebug to ensure that after you have made any changes you have enough memory to be stable. 
 //Note some messages have been shortened to save memory. Messages that start with "<" symbolize "Start" messages that start with ">" symbolize "End"
-//At the time of this writing enabled is 82% and disabled is 58% free memrory for runtime
+//ERR is short for Error
+//val is short for value
+//cmnd is short for command
+//Reciently v1.0.0.6 I have made heavey use of the F String Macro to move strings to the Program space. This has helped alot. 
+//There is plenty of program space so using the F macro seems to be the answer to the run time memory issue when using string. 
+//At the time of this writing enabled is 46%(1104 bytes free) and disabled is 43%(1167 bytes free) free memrory for runtime
+//I may in the near future just remove the includeDegbug define and the associated checks. 
 #define includeDebug
 
 
-#define VERSIONINFO "NanoSerialIO 1.0.5"
+#define VERSIONINFO "NanoSerialIO 1.0.6"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #include "TimeRelease.h"
 #include <Bounce2.h>
@@ -49,19 +55,19 @@ bool EventTriggeringEnabled = 1;
 
 void StoreIOConfig(){
   #ifdef includeDebug
-    debugMsg("< Saving IO Config");
+    debugMsg(F("< Saving IO Config"));
   #endif
   int cs = 0;
   for (int i=0;i<IOSize;i++){
     EEPROM.update(i+1,IOType[i]); //store IO type map in eeprom but only if they are different... Will make it last a little longer but unlikely to really matter.:) 
     cs += IOType[i];
     #ifdef includeDebug
-      if(_debug){debugMsgPrefx();Serial.print("EE Pos:");Serial.print(i);Serial.print(" typ:");Serial.println(IOType[i]);Serial.print(" Cur CS:");Serial.println(cs);}
+      if(_debug){debugMsgPrefx();Serial.print(F("EE Pos:"));Serial.print(i);Serial.print(F(" typ:"));Serial.println(IOType[i]);Serial.print(F(" Cur CS:"));Serial.println(cs);}
     #endif
   }
   EEPROM.update(0,cs); 
   #ifdef includeDebug
-    if(_debug){debugMsgPrefx();Serial.print("Chk-S:");Serial.println(cs);}
+    if(_debug){debugMsgPrefx();Serial.print(F("Chk-S:"));Serial.println(cs);}
   #endif
 }
 
@@ -78,7 +84,7 @@ void FetchIOConfig(){
   }
 
   #ifdef includeDebug
-    if(_debug){debugMsgPrefx();Serial.print("tmpCS: ");Serial.println(tempCS);}
+    if(_debug){debugMsgPrefx();Serial.print(F("tmpCS: "));Serial.println(tempCS);}
   #endif    
   
   if(cs == tempCS){
@@ -89,7 +95,7 @@ void FetchIOConfig(){
     return;  
   }
   #ifdef includeDebug
-  if(_debug){debugMsgPrefx();Serial.print("!:Using IO defaults");Serial.println(tempCS);}
+  if(_debug){debugMsgPrefx();Serial.print(F("!:Using IO defaults"));Serial.println(tempCS);}
   #endif
 }
 
@@ -133,7 +139,7 @@ void setup() {
   debugMsg(VERSIONINFO);
   
   #ifdef includeDebug 
-    debugMsg("< Types");
+    debugMsg(F("< Types"));
   #endif
   
   FetchIOConfig();
@@ -141,7 +147,7 @@ void setup() {
   reportIOTypes();
   
   #ifdef includeDebug 
-    debugMsg("> Types");
+    debugMsg(F("> Types"));
     _debug = true;
   #endif
   
@@ -151,7 +157,7 @@ void setup() {
   }
   
   IOReport.set(100ul);
-  Serial.println("RR"); //send ready for commands    
+  Serial.println(F("RR")); //send ready for commands    
 }
 
 
@@ -173,7 +179,7 @@ void loop() {
 
 void reportIO(bool forceReport){
   if (IOReport.check()||forceReport){
-    Serial.print("IO:");
+    Serial.print(F("IO:"));
     for (int i=0;i<IOSize;i++){
       IO[i] = digitalRead(IOMap[i]);  
       Serial.print(IO[i]);
@@ -204,7 +210,7 @@ bool checkIO(){
       //the serial commands force a report after it takes action.
       if(IO[i] != digitalRead(IOMap[i])){
         #ifdef includeDebug 
-        if(_debug){debugMsg("IO Chg: "+String(i));}
+        if(_debug){debugMsgPrefx();Serial.print(F("IO Chg: "));Serial.print(String(i));}
         #endif
         changed = true;
       }
@@ -216,14 +222,14 @@ bool checkIO(){
 }
 
 void reportIOTypes(){
-  Serial.print("IT:");
+  Serial.print(F("IT:"));
   for (int i=0;i<IOSize;i++){
     Serial.print(String(IOType[i]));
-    Serial.print(",");
+    Serial.print(F(","));
   }
   Serial.println();
   #ifdef includeDebug 
-    if(_debug){debugMsg("IOSize:" + String(IOSize));}
+    if(_debug){debugMsgPrefx();Serial.print(F("IOSize:")); Serial.println(String(IOSize));}
   #endif
 }
 
@@ -237,34 +243,34 @@ void checkSerial(){
     String command ="";
     String value = "";
     
-    if(sepPos){
+    if(sepPos !=-1){
       command = buf.substring(0,sepPos);
       value = buf.substring(sepPos+1);;
       
       #ifdef includeDebug
       if(_debug){
-        debugMsg("command:[" + command + "]");
-        debugMsg("value:[" + value+ "]");
+        debugMsg("cmnd:[" + command + "]");
+        debugMsg("val:[" + value+ "]");
       }
       #endif 
     }else{
       command = buf;
       #ifdef includeDebug
       if(_debug){
-        debugMsg("command:[" + command + "]");
+        debugMsg("cmnd:[" + command + "]");
       }
       #endif
     }
     if(command.startsWith("N") || command == "M115"){
       ack();
       
-      Serial.println("Recieved a command that looks like OctoPrint thinks I am a printer.");
-      Serial.println("This is not a printer it is a SIOControler. Sending disconnect host action command.");
+      Serial.println(F("Looks like OctoPrint thinks I am a printer."));
+      Serial.println(F("I not printer; Am SIOControler. Send disconnect host action cmnd."));
       #ifdef includeDebug
-      Serial.println("To avoide this you should place the name/path of this port in the [Blacklisted serial ports] section of Octoprint");
-      Serial.println("This can be found in the settings dialog under 'Serial Connection'");
+      Serial.println(F("To avoide this you should place the name/path of this port in the [Blacklisted serial ports] section of Octoprint"));
+      Serial.println(F("This can be found in the settings dialog under 'Serial Connection'"));
       #endif
-      Serial.println("//action:disconnect");
+      Serial.println(F("//action:disconnect"));
     }
     else if(command == "BIO"){ 
       ack();
@@ -277,36 +283,42 @@ void checkSerial(){
       return;
     }
     else if (command == "VC"){//version and compatibility
-      Serial.print("VI:");
+      Serial.print(F("VI:"));
       Serial.println(VERSIONINFO);
-      Serial.print("CP:");
+      Serial.print(F("CP:"));
       Serial.println(COMPATIBILITY);
     }
     else if (command == "IC") { //io count.
       ack();
-      Serial.print("IC:");
+      Serial.print(F("IC:"));
       Serial.println(IOSize -1);
       return;
     }
     
-    else if(command =="debug"){
+    else if(command =="debug" && value.length() == 1){
       ack();
       #ifdef includeDebug
         if(value == "1"){
           _debug = true;
-          debugMsg("Serial debug On");
+          debugMsg(F("Debug On"));
         }else{
           _debug=false;
-          debugMsg("Serial debug Off");
+          debugMsg(F("Debug Off"));
         }
       #else
-      debugMsg("debug not enabled");
+      debugMsg(F("debug disabled"));
       #endif
       return;
     }
     else if(command=="CIO"){ //set IO Configuration
       ack();
-      if (validateNewIOConfig(value)){
+      if(value.length() == 0){ //set IO Configuration
+      if(_debug){
+        #ifdef includeDebug
+        debugMsg(F("ERR: val out of rng"));
+        #endif
+      }
+      }else if (validateNewIOConfig(value)){
         updateIOConfig(value);
       }
       return;
@@ -324,60 +336,81 @@ void checkSerial(){
     }
     
     //Set IO point high or low (only applies to IO set to output)
-    else if(command =="IO" && value.length() > 0){
+    else if(command =="IO"){ 
       ack();
-      int IOPoint = value.substring(0,value.indexOf(" ")).toInt();
-      int IOSet = value.substring(value.indexOf(" ")+1).toInt();
-      #ifdef includeDebug
-      if(_debug){
-        debugMsg("IO#:"+ String(IOMap[IOPoint]));
-        debugMsg("Set to:"+ String(IOSet));
+      if(value.length() < 3){
+        debugMsg(F("ERR: value out of range"));
+        return;
       }
-      #endif
-      if(isOutPut(IOPoint)){
-        if(IOSet == 1){
-          digitalWrite(IOMap[IOPoint],HIGH);
-        }else{
-          digitalWrite(IOMap[IOPoint],LOW);
+      
+      if(value.indexOf(" ") >=1 && value.substring(value.indexOf(" ")+1).length()==1){//is there at least one character for the IO number and the value for this IO point must be only one character (1||0)
+        String sIOPoint = value.substring(0,value.indexOf(" "));
+        String sIOSet = value.substring(value.indexOf(" ")+1); // leaving this as a string allows for easy check on correct posible values
+        #ifdef includeDebug
+        if(_debug){
+          debugMsg("IO#:"+ sIOPoint);
+          debugMsg("GPIO#:"+ String(IOMap[sIOPoint.toInt()]));
+          debugMsg("Set to:"+ sIOSet);
         }
+        #endif
+
+        //checks to see if the IO point is not a number if the string is not a zero but the number is that means it was not a number
+        if(isOutPut(sIOPoint.toInt()) && !(sIOPoint.toInt() == 0 && sIOPoint != "0") ){
+          if(sIOSet == "0" || sIOSet == "1"){// need to make sure it is a valid IO point value 
+            if(sIOSet == "1"){
+              digitalWrite(IOMap[sIOPoint.toInt()],HIGH);
+            }else{
+              digitalWrite(IOMap[sIOPoint.toInt()],LOW);
+            }
+          }else{
+            debugMsg(F("ERR: Atmpt set IO value not valid"));   
+          }
+        }else{
+          debugMsg(F("ERR: Atmpt set IO not an output"));   
+        }
+        //delay(200); // give it a moment to finish changing the 
+        reportIO(true);
       }else{
-        debugMsg("ERR:IO not output");   
+        debugMsg(F("ERR: invalid cmd/vlu"));   
       }
-      reportIO(true);
       return;
     }
     
     //Set AutoReporting Interval  
-    else if(command =="SI" && value.length() > 0){
+    else if(command =="SI"){ 
       ack();
-      unsigned long newTime = 0;
-      if(strToUnsignedLong(value,newTime)){ //will convert to a full long.
-        if(newTime >=500){
+      if(value.length() > 2){
+        long newTime = value.toInt();
+        if(newTime >=500 && (String(newTime) == value)){
           reportInterval = newTime;
           IOReport.clear();
           IOReport.set(reportInterval);
-          #ifdef includeDebug
-          if(_debug){
-            debugMsg("Report interval now:" +String(reportInterval));
-          }
-          #endif
+          debugMsgPrefx();Serial.print(F("ART now:"));Serial.println(String(reportInterval));
         }else{
-          debugMsg("Min val 500");
+          debugMsg(F("ERR: # out of range."));
         }
         return;
       }
-      debugMsg("ERROR: SI Format");
+      debugMsg(F("ERR: # out of range."));
       return; 
     }
     //Enable event trigger reporting Mostly used for E-Stop
-    else if(command == "SE" && value.length() > 0){
+    else if(command == "SE"){
       ack();
-      EventTriggeringEnabled = value.toInt();
+      if(value.length() == 1){
+        if(value == "1" || value == "0"){
+          EventTriggeringEnabled = value.toInt();
+        }else{
+          debugMsg(F("EROR: val out of range"));
+        }
+      }else{
+        debugMsg(F("EROR: val bad format"));
+      }
       return;
     }
     else if (command == "restart" || command == "reset" || command == "reboot"){ //could remove this completely to save some memory
       ack();
-      debugMsg("Command not supported.");
+      debugMsg(F("!supported"));
     }
 
     //Get States 
@@ -388,21 +421,21 @@ void checkSerial(){
     }
    
     else{
-      debugMsg("ERR: Unrecognized command["+command+"]");
+      debugMsgPrefx();Serial.print(F("ERR: bad cmnd["));Serial.print(command);Serial.println(F("]"));
     }
   }
 }
 
 
 void ack(){
-  Serial.println("OK");
+  Serial.println(F("OK"));
 }
 
 bool validateNewIOConfig(String ioConfig){
   
   if(ioConfig.length() != IOSize){
     #ifdef includeDebug
-      if(_debug){Serial.println("IOConfig validation failed(Wrong len)");}
+      if(_debug){debugMsg(F("IOConfig validation failed(Wrong len)"));}
     #endif
     return false;  
   }
@@ -412,14 +445,15 @@ bool validateNewIOConfig(String ioConfig){
     if(pointType > 4){//cant be negative. we would have a bad parse on the number so no need to check negs
       #ifdef includeDebug
       if(_debug){
-        Serial.println("IO validation failed");Serial.print("Bad IO Type: index[");Serial.print(i);Serial.print("] type[");Serial.print(pointType);Serial.println("]");
+        debugMsgPrefx();Serial.println(F("IO validation failed"));
+        debugMsgPrefx();Serial.print(F("Bad IO Type: index["));Serial.print(i);Serial.print(F("] type["));Serial.print(pointType);Serial.println(F("]"));
       }
       #endif
       return false;
     }
   }
   #ifdef includeDebug
-  if(_debug){Serial.println("IOConfig validation good");}
+  if(_debug){debugMsg(F("IOConfig validation good"));}
   #endif
   return true; //seems its a good set of point Types.
 }
@@ -444,18 +478,6 @@ int getIOType(String typeName){
   if(typeName == "OUTPUT_OPEN_DRAIN"){return 4;} //not sure on this value have to double check
 }
 
-bool strToUnsignedLong(String& data, unsigned long& result) {
-  data.trim();
-  long tempResult = data.toInt();
-  if (String(tempResult) != data) { // check toInt conversion
-    return false;
-  } else if (tempResult < 0) { //  OK check sign
-    return false;
-  } 
-  result = tempResult;
-  return true;
-}
-
 
 void debugMsg(String msg){
   debugMsgPrefx();
@@ -463,5 +485,5 @@ void debugMsg(String msg){
 }
  
 void debugMsgPrefx(){
-  Serial.print("DG:");
+  Serial.print(F("DG:"));
 }
