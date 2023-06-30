@@ -62,6 +62,7 @@ bool checkAuth(){
     #ifdef USE_DIGESTAUTH
     webServer.requestAuthentication(DIGEST_AUTH, www_realm, authFailResponse);
       #ifdef _GDebug
+      debugMsgPrefx();
       Serial.print("AuthFailed?:");
       Serial.println(authFailResponse);
       #endif
@@ -81,11 +82,12 @@ bool handleFileRead(String path) {
     return false;
     
   #ifdef _GDebug
-  Serial.println("start handleFileRead");
+  debugMsgPrefx();Serial.println("start handleFileRead");
   #endif
   
   if (SPIFFS.exists(path)) {
     #ifdef _GDebug
+    debugMsgPrefx();
     Serial.print("File found:");
     Serial.println(path);
     #endif
@@ -99,6 +101,7 @@ bool handleFileRead(String path) {
     return true;
   }else{
     #ifdef _GDebug
+    debugMsgPrefx();
     Serial.print("File not found");
     Serial.println(path);
     #endif
@@ -108,7 +111,7 @@ bool handleFileRead(String path) {
 
 void initialisePages(){
   #ifdef _GDebug
-  Serial.println("Initializing pages start");
+  debugMsgPrefx();Serial.println("Initializing pages start");
   #endif
   webServer.serveStatic("/config.js",SPIFFS,"/config.js");//.setAuthentication(www_username,wifiConfig.apPassword);
   webServer.serveStatic("/ioconfig.js",SPIFFS,"/ioconfig.js");//.setAuthentication(www_username,wifiConfig.apPassword);
@@ -118,25 +121,25 @@ void initialisePages(){
   
   webServer.on("/config",HTTP_GET,[]{
     #ifdef _GDebug
-    Serial.println("start config");
+    debugMsg("start config");
     #endif
     
     handleFileRead("/config.htm");
     
     #ifdef _GDebug
-    Serial.println("end config");
+    debugMsg("end config");
     #endif
   });
 
   webServer.on("/ioconfig",HTTP_GET,[]{
     #ifdef _GDebug
-    Serial.println("start ioconfig");
+    debugMsg("start ioconfig");
     #endif
     
     handleFileRead("/ioconfig.htm");
     
     #ifdef _GDebug
-    Serial.println("end ioconfig");
+    debugMsg("end ioconfig");
     #endif
   });
   
@@ -205,7 +208,7 @@ void initialisePages(){
     storeWifiScanResult(n);
     doWiFiScan = true;
     #ifdef _GDebug
-    Serial.print("Network Scanned requested:");
+    debugMsg("Network Scan requested");
     #endif
     webServer.send(200, "text/plain","OK" );
   });
@@ -214,12 +217,12 @@ void initialisePages(){
   if(!checkAuth()){return;}
     if(Networks.length() == 0){
       #ifdef _GDebug
-      Serial.println("Sending Empty Network list");
+      debugMsg("Sending Empty Network list");
       #endif
       webServer.send(200, "application/json", "{\"networks\":[]}");
     }else{
       #ifdef _GDebug
-      Serial.println("Sending Network list");
+      debugMsg("Sending Network list");
       #endif
       
       webServer.send(200, "application/json", Networks);
@@ -232,7 +235,7 @@ void initialisePages(){
 
     if(webServer.hasArg("update")){
       #ifdef _GDebug
-      Serial.println("updating settings");
+      debugMsg("updating settings");
       #endif
 
       strlcpy(wifiConfig.wifimode, webServer.arg("cbo_WFMD").c_str(), sizeof(wifiConfig.wifimode));
@@ -245,11 +248,11 @@ void initialisePages(){
       
       
       #ifdef _GDebug
-      Serial.println("AfterUpdate: wificonfig");
+      debugMsg("AfterUpdate: wificonfig");
       DebugwifiConfig();
       #endif
       
-      Serial.println("before direct Update: SettingsConfig");
+      debugMsg("before direct Update: SettingsConfig");
       DebugSettingsConfig(); //prints the settings struct to the Serial line
       
       //MQTT settings (future)
@@ -269,7 +272,7 @@ void initialisePages(){
 
 
       
-      Serial.println("After direct Update: SettingsConfig");
+      debugMsg("After direct Update: SettingsConfig");
       DebugSettingsConfig(); //prints the settings struct to the Serial line
       
       
@@ -281,7 +284,7 @@ void initialisePages(){
       
     }else if(webServer.hasArg("reboot")){
       #ifdef _GDebug
-      Serial.println("web called a reboot");
+      debugMsg("web called a reboot");
       #endif
       
       LastStatus = "Rebooting in 5 Sec";
@@ -292,7 +295,7 @@ void initialisePages(){
     
     handleFileRead("/config.htm");
     #ifdef _GDebug
-    Serial.println("end post config");
+    debugMsg("end post config");
     #endif
     
   });
@@ -302,7 +305,7 @@ void initialisePages(){
 
     if(webServer.hasArg("update")){
       #ifdef _GDebug
-      Serial.println("updating ioconfig");
+      debugMsg("updating ioconfig");
       #endif  
       
       String newIOConfig = "";
@@ -311,7 +314,7 @@ void initialisePages(){
       }
 
       #ifdef _GDebug
-      Serial.print("New IO String:");
+      debugMsgPrefx();Serial.print("New IO String:");
       Serial.println(newIOConfig);
       #endif
 
@@ -323,7 +326,7 @@ void initialisePages(){
     handleFileRead("/ioconfig.htm");
   
     #ifdef _GDebug
-    Serial.println("end post config");
+    debugMsg("end post config");
     #endif
     
   });

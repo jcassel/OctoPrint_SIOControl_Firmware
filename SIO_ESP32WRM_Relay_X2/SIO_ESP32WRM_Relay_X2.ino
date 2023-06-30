@@ -3,7 +3,7 @@
 //Reports IO status created for use with OctoPrint_SIOControl_plugin
 #define ENABLE_WIFI_SUPPORT
 
-#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.0.8"
+#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.0.9"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #define DEFAULT_HOSTS_NAME "SIOControler-New"
 

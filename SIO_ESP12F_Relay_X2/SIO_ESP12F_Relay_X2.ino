@@ -10,7 +10,7 @@
 #include "global.h"
 #define _GDebug 
 #define USE_DIGESTAUTH
-#define VERSIONINFO "SIO_ESP12F_Relay_X2 1.0.8"
+#define VERSIONINFO "SIO_ESP12F_Relay_X2 1.0.9"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #define DEFAULT_HOSTS_NAME "SIOControler-New"
 #include "TimeRelease.h"
