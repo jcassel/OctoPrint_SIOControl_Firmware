@@ -1,68 +1,56 @@
-//Simple Serial IO Driver
-//Takes serial commands to control configured IO.
-//Reports IO status created for use with OctoPrint_SIOControl_plugin
+//Note that this sketch is too large due to some of the Serial String use for an Arduino Nano.
+  
 
-#define VERSIONINFO "SIO_ESP32WRM_Relay_X4 1.0.5"
+#define VERSIONINFO "SIO_Arduino_General 1.0.8"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #include "TimeRelease.h"
-#include <ArduinoJson.h> 
-#include "FS.h"
-#include <SPIFFS.h>   // Filesystem support header
-#define FS_NO_GLOBALS
-#include <WiFi.h>
 #include <Bounce2.h>
 
-//note that there are some IO points that are not optimal to use as basic IO points. There state at start up of the 
-//device migh cause issue where the device could go into programing mode or the IO pin might be pulsed on startup. 
-//These pins on the Esp32wroom module are 0,1,3,5, and 12. 
-//GPIO 0 outputs a PWM Signal at boot and will cause the module to go into programming mode if it is pulled low on boot. 
-//GPIO 1 is the TX pin and will output debug data on boot.
-//GPIO 3 is the RX pin and will go high on boot. 
-//GPIO 5 outputs a PWM Signal at boot, is a strapping pin
-//GPIO 12 boot will fail if it is pulled High during a boot, is a strapping pin
-//These iopoints are used for SPI Flash (6,7,8,9,10,11) so they also should not be used by user code. 
-//GPIO 14 outputs a PWM Signal at boot, is a strapping pin
-//GPIO 15 outputs a PWM Signal at boot.
-//Additionally IO 34,35,36,and39 can only be used as inputs.
-//reference: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
-
-#define IO0 34  //  Input Only (Must configure(in code) without pullup or down. These inputs do not have these on chip)
-#define IO1 35  //  Input Only (Must configure(in code) without pullup or down. These inputs do not have these on chip)
-#define IO2 36  //  Input Only (Must configure(in code) without pullup or down. These inputs do not have these on chip)
-#define IO3 39  //  input only (Must configure(in code) without pullup or down. These inputs do not have these on chip)
-#define IO4 0   //  general IO Important note.. if this is in a low state on boot of the device, it will go into programing mode.
-#define IO5 5   //  general IO Important note.. Will output a PWM signal on boot. Should not have any affect if configured as an input.
-#define IO6 12  //  general IO Important note.. boot will failif this is pulled high during boot.
-#define IO7 13  //  general IO touch capable
-#define IO8 14  //  general IO Important note.. Will output a PWM signal on boot. Should not have any affect if configured as an input.
-#define IO9 16  //  general IO (RXD 2)
-#define IO10 17 //  general IO (TXD 2)
-#define IO11 26 //  Relay K1
-#define IO12 25 //  Relay K2
-#define IO13 33 //  Relay K3
-#define IO14 32 //  Relay K4
-#define IO15 23 //  output only LED 
 
 
-#define IOSize  16 //number should be one more than the IO# :) (must include the idea of Zero) 
+#define IOSize  19 //number should be one more than the IO# :) (must include the idea of Zero)  
+//Outputs
+#define IO0 3  
+#define IO1 4
+#define IO2 5
+#define IO3 6
+#define IO4 7
+#define IO5 8
+#define IO6 9
+#define IO7 10
+#define IO8 11
+#define IO9 12
+#define IO10 13
+//Inputs
+#define IO11 A0
+#define IO12 A1
+#define IO13 A2 
+#define IO14 A3
+#define IO15 A4
+#define IO16 A5
+#define IO17 A6
+#define IO18 A7 
+
 bool _debug = false;
-int IOType[IOSize]{INPUT,INPUT,INPUT,INPUT,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT};
-int IOMap[IOSize] {IO0,IO1,IO2,IO3,IO4,IO5,IO6,IO7,IO8,IO9,IO10,IO11,IO12,IO13,IO14,IO15};
-String IOSMap[IOSize] {"IO0","IO1","IO2","IO3","IO4","IO5","IO6","IO7","IO8","IO9","IO10","IO11","IO12","IO13","IO14","IO15"};
+
+int IOType[IOSize]{OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, INPUT, INPUT, INPUT, INPUT, INPUT, INPUT, INPUT, INPUT };
+int IOMap[IOSize] {IO0,IO1,IO2,IO3,IO4,IO5,IO6,IO7,IO8,IO9,IO10,IO11,IO12,IO13,IO14,IO15,IO16,IO17,IO18};
+String IOSMap[IOSize] {"IO0","IO1","IO2","IO3","IO4","IO5","IO6","IO7","IO8","IO9","IO10","IO11","IO12","IO13","IO14","IO15","IO16","IO17","IO18"};
 int IO[IOSize];
 Bounce Bnc[IOSize];
 bool EventTriggeringEnabled = 1;
-
-
+ 
+//void(* resetFunc) (void) = 0;
+ 
 bool isOutPut(int IOP){
   return IOType[IOP] == OUTPUT; 
 }
-
+ 
 void ConfigIO(){
   
   Serial.println("Setting IO");
   for (int i=0;i<IOSize;i++){
-    if(IOType[i] == 0 ||IOType[i] == 2 || IOType[i] == 3){ //if it is an input
+    if(i > 10){ //if it is an input
       pinMode(IOMap[i],IOType[i]);
       Bnc[i].attach(IOMap[i],IOType[i]);
       Bnc[i].interval(5);
@@ -71,35 +59,27 @@ void ConfigIO(){
       digitalWrite(IOMap[i],LOW);
     }
   }
-
+ 
 }
-
-
-
+ 
+ 
+ 
 TimeRelease IOReport;
 TimeRelease ReadyForCommands;
-
+ 
 unsigned long reportInterval = 3000;
-
-
-
-
+ 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   delay(300);
   debugMsg(VERSIONINFO);
-  debugMsg("Disabling Wifi");
-  WiFi.mode(WIFI_OFF);    //The entire point of this project is to not use wifi but have directly connected IO for use with the OctoPrint PlugIn and subPlugIn
-  debugMsg("Start Types");
-  InitStorageSetup();
-  loadIOConfig();
   debugMsg("Initializing IO");
   ConfigIO();
   
   reportIOTypes();
   debugMsg("End Types");
-
+ 
   //need to get a baseline state for the inputs and outputs.
   for (int i=0;i<IOSize;i++){
     IO[i] = digitalRead(IOMap[i]);  
@@ -110,11 +90,11 @@ void setup() {
   DisplayIOTypeConstants();
   
 }
-
-
+ 
+ 
 bool _pauseReporting = false;
 bool ioChanged = false;
-
+ 
 //*********************Start loop***************************//
 void loop() {
   // put your main code here, to run repeatedly:
@@ -130,7 +110,7 @@ void loop() {
   
 }
 //*********************End loop***************************//
-
+ 
 void reportIO(bool forceReport){
   if (IOReport.check()||forceReport){
     Serial.print("IO:");
@@ -145,7 +125,7 @@ void reportIO(bool forceReport){
     
   }
 }
-
+ 
 bool checkIO(){
   bool changed = false;
   
@@ -174,8 +154,8 @@ bool checkIO(){
     
   return changed;
 }
-
-
+ 
+ 
 void reportIOTypes(){
   Serial.print("IT:");
   for (int i=0;i<IOSize;i++){
@@ -186,26 +166,26 @@ void reportIOTypes(){
   Serial.println();
   debugMsg("IOSize:" + String(IOSize));
 }
-
+ 
 void DisplayIOTypeConstants(){
   debugMsgPrefx();Serial.print("INPUT:");Serial.println(INPUT);//1
   debugMsgPrefx();Serial.print("OUTPUT:");Serial.println(OUTPUT);//2
   debugMsgPrefx();Serial.print("INPUT_PULLUP:");Serial.println(INPUT_PULLUP);//5
-  debugMsgPrefx();Serial.print("INPUT_PULLDOWN:");Serial.println(INPUT_PULLDOWN);//9
-  debugMsgPrefx();Serial.print("OUTPUT_OPEN_DRAIN:");Serial.println(OUTPUT_OPEN_DRAIN);//18
+  //debugMsgPrefx();Serial.print("INPUT_PULLDOWN:");Serial.println(INPUT_PULLDOWN);//9
+  //debugMsgPrefx();Serial.print("OUTPUT_OPEN_DRAIN:");Serial.println(OUTPUT_OPEN_DRAIN);//18
 }
-
+ 
 void checkSerial(){
   if (Serial.available()){
     
-      String buf = Serial.readStringUntil('\n');
+    String buf = Serial.readStringUntil('\n');
     buf.trim();
     if(_debug){debugMsg("buf:" + buf);}
     int sepPos = buf.indexOf(" ");
     String command ="";
     String value = "";
     
-    if(sepPos != -1){
+    if(sepPos !=-1){
       command = buf.substring(0,sepPos);
       value = buf.substring(sepPos+1);;
       if(_debug){
@@ -218,7 +198,6 @@ void checkSerial(){
         debugMsg("command:[" + command + "]");
       }
     }
-    
     if(command.startsWith("N") || command == "M115"){
       ack();
       Serial.println("Recieved a command that looks like OctoPrint thinks I am a printer.");
@@ -261,8 +240,9 @@ void checkSerial(){
       }
       return;
     }
-    else if(command=="CIO"){
+    else if(command=="CIO"){ //set IO Configuration
       ack();
+      debugMsg("Live IO confiuration feature is only partially supported.");
       if(value.length() == 0){ //set IO Configuration
         debugMsg("ERROR: command value out of range");
       }else if (validateNewIOConfig(value)){
@@ -270,9 +250,11 @@ void checkSerial(){
       }
       return;
     }
+    
     else if(command=="SIO"){
       ack();
-      StoreIOConfig();
+      debugMsg("Live IO confiuration feature is not avalible in this firmware");
+      debugMsg("To change IO configuration you must edit and update firmware");
       return;
     }
     else if(command=="IOT"){
@@ -339,6 +321,7 @@ void checkSerial(){
       debugMsg("ERROR: bad format number out of range.(500- 2147483647); actual sent [" + value + "]; Len["+String(value.length())+"]");
       return; 
     }
+    
     //Enable event trigger reporting Mostly used for E-Stop
     else if(command == "SE"){
       ack();
@@ -354,30 +337,34 @@ void checkSerial(){
       return;
     }
     else if (command == "restart" || command == "reset" || command == "reboot"){
-      debugMsg("[WARNING]: Restarting device");
-      ESP.restart();
+      ack();
+      debugMsg("Command not supported.");
     }
-
+ 
     //Get States 
     else if(command == "GS"){
       ack();
       reportIO(true);
       return; 
     }
+    else{
+      debugMsg("ERROR: Unrecognized command["+command+"]");
+    }
   }
 }
-
+ 
 void ack(){
   Serial.println("OK");
 }
 
+//Because there is no way to store between uses, know that chaneges will not survive restarts.
 bool validateNewIOConfig(String ioConfig){
   
   if(ioConfig.length() != IOSize){
     if(_debug){debugMsg("IOConfig validation failed(Wrong len)");}
     return false;  
   }
-
+ 
   for (int i=0;i<IOSize;i++){
     int pointType = ioConfig.substring(i,i+1).toInt();
     if(pointType > 4){//cant be negative. we would have a bad parse on the number so no need to check negs
@@ -390,7 +377,7 @@ bool validateNewIOConfig(String ioConfig){
   if(_debug){debugMsg("IOConfig validation good");}
   return true; //seems its a good set of point Types.
 }
-
+ 
 void updateIOConfig(String newIOConfig){
   for (int i=2;i<IOSize;i++){//start at 2 to avoid D0 and D1
     int nIOC = newIOConfig.substring(i,i+1).toInt();
@@ -403,13 +390,31 @@ void updateIOConfig(String newIOConfig){
   }
 }
 
+
+//Note that this list and values must be updated to match the expected for your MCU 
 int getIOType(String typeName){
   if(typeName == "INPUT"){return 1;}
   if(typeName == "OUTPUT"){return 2;}
   if(typeName == "INPUT_PULLUP"){return 5;}
-  if(typeName == "INPUT_PULLDOWN"){return 9;}
-  if(typeName == "OUTPUT_OPEN_DRAIN"){return 18;} //not sure on this value have to double check
+  //if(typeName == "INPUT_PULLDOWN"){return 9;}
+  //if(typeName == "OUTPUT_OPEN_DRAIN"){return 18;} //not sure on this value have to double check
+  Serial.print("ERROR: unrecognized IOType name IOType["+typeName+"]");
+  return 0;
 }
+
+
+//Note that this list and values must be updated to match the expected for your MCU  
+String getIOTypeString(int ioType){
+  if (ioType == 1){return "INPUT";}
+  if (ioType == 2){return "OUTPUT";}
+  if (ioType == 5){return "INPUT_PULLUP";}
+  //if (ioType == 9){return "INPUT_PULLDOWN";}
+  //if (ioType == 18){return "OUTPUT_OPEN_DRAIN";}
+  Serial.print("ERROR: unrecognized IOType value[");Serial.print(ioType);Serial.println("]");
+  return "";
+}
+
+
 
 bool strToUnsignedLong(String& data, unsigned long& result) {
   data.trim();
@@ -425,128 +430,12 @@ bool strToUnsignedLong(String& data, unsigned long& result) {
   result = tempResult;
   return true;
 }
-
-
-
-bool loadIOConfig(){
-  
-if (!SPIFFS.exists("/IOConfig.json"))
-  {
-    debugMsg("[WARNING]: IOConfig file not found!");
-    debugMsg("Using Default Config");
-    return false;
-  }
-  File configfile = SPIFFS.open("/IOConfig.json","r");
-
-  DynamicJsonDocument doc(2048);
-
-  DeserializationError error = deserializeJson(doc, configfile);
-  for (int i=0;i<IOSize;i++){
-    IOType[i] = getIOType(doc[IOSMap[i]]) ;
-  }
-
-  if(_debug){
-    debugMsg("loaded IO From json: ");
-    String jsonConfig;
-    serializeJson(doc, jsonConfig); 
-    debugMsg(jsonConfig);  
-    //serializeJson(doc, Serial);
-  }
-  configfile.close();
-
-  if (error)
-  {
-    debugMsg("[ERROR]: deserializeJson() error in loadIOConfig");
-    debugMsg(error.c_str());
-    return false;
-  }else{
-    debugMsg("Loaded IO Config from storage");
-  }
-  
-  return true;
-}
-
-
-
-bool StoreIOConfig(){
-  SPIFFS.remove("/IOConfig.json");
-  File file = SPIFFS.open("/IOConfig.json", "w");
-  if(_debug){debugMsg("saving IO Config");}
-  DynamicJsonDocument doc(2048);
-
-  JsonObject configObj = doc.to<JsonObject>();
-
-  for (int i=0;i<IOSize;i++){
-    configObj[IOSMap[i]]= getIOTypeString(IOType[i]);
-  }
-  
-  
-  if(_debug){
-    debugMsg("Saved IO as json: ");    
-    String jsonConfig;
-    serializeJson(configObj, jsonConfig); 
-    debugMsg(jsonConfig);
-  }
-    
-  
-  if (serializeJsonPretty(doc, file) == 0)
-  {
-    debugMsg("[WARNING]: Failed to write to file:/IOConfig.json");
-    return false;
-  }
-  file.close();
-  if(_debug){debugMsg("Saved IO Config");}
-  return true;
-}
-
-
-float SpaceLeft()
-{
-  float freeMemory = SPIFFS.totalBytes() - SPIFFS.usedBytes();
-  return freeMemory;
-}
-
-
-bool IsSpaceLeft()
-{
-  float minmem = 100000.00; // Always leave 100 kB free pace on SPIFFS
-  float freeMemory = SpaceLeft();
-  if(_debug){String s = "[INFO]: Free memory left: "; s += freeMemory; s += "bytes"; debugMsg(s);}
-  
-  if (freeMemory < minmem)
-  {
-    return false;
-  }
-
-  return true;
-}
-
-String getIOTypeString(int ioType){
-  if (ioType == 1){return "INPUT";}
-  if (ioType == 2){return "OUTPUT";}
-  if (ioType == 5){return "INPUT_PULLUP";}
-  if (ioType == 9){return "INPUT_PULLDOWN";}
-  if (ioType == 18){return "OUTPUT_OPEN_DRAIN";}
-}
-
-#define FORMAT_SPIFFS_IF_FAILED true
-void InitStorageSetup(){
-   if(!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)){
-      debugMsg("Warning SPIFFS Mount Failed (Attempt Restart if this is the first time this firmware was loaded.)");
-      return;
-   }
-
-  
-  //SPIFFS.begin();
-  //do anything that might be needed related to file and storage on startup.
-}
-
-
+ 
 void debugMsg(String msg){
   debugMsgPrefx();
   Serial.println(msg);
 }
-
+ 
 void debugMsgPrefx(){
   Serial.print("DG:");
 }
