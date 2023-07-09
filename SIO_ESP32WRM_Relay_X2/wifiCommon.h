@@ -9,7 +9,12 @@ TimeRelease resetTimeDelay;
 
 
 uint32_t getChipId(){
-  return ESP.getChipId();
+  uint32_t chipId = 0;
+  for(int i=0; i<17; i=i+8) {
+    chipId |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
+  }
+  
+  return chipId;
 }
 
 WiFiUDP ntpUDP;
@@ -41,7 +46,7 @@ struct SettingsConfig
 SettingsConfig settingsConfig;
 WifiConfig wifiConfig;
 char* www_username = "admin";
-ESP8266WebServer webServer(80);
+WebServer webServer(80);
 int lastWifiStatus = -1;
 
 
@@ -64,6 +69,7 @@ bool startWifiStation(){
     debugMsgPrefx();Serial.printf("Existing set WiFi.SSID:%s\n",WiFi.SSID().c_str());
     debugMsgPrefx();Serial.printf("wifiConfig.ssid:%s\n",wifiConfig.ssid);
   }
+  
   if(String(wifiConfig.wifimode) == "WIFI_STA"){
     if ( String(WiFi.SSID()) != String(wifiConfig.ssid) || WifiInitialized == false)
     {
@@ -78,7 +84,7 @@ bool startWifiStation(){
         WiFi.mode(WIFI_STA);
         WiFi.begin(wifiConfig.ssid, wifiConfig.password);
         WifiInitialized = true;
-        uint8_t attempts = wifiConfig.attempts;
+        int attempts = wifiConfig.attempts;
         debugMsgPrefx();Serial.print("connecting ."); //dots per try "..."
         while (!isWiFiConnected())
         {
@@ -93,10 +99,12 @@ bool startWifiStation(){
           Serial.print(".");
           attempts--;
        }
-       if(_debug){
-         debugMsgPrefx();Serial.print("IP: ");
-         Serial.println(WiFi.localIP());  
-       }
+       Serial.println(""); //closes off the connection "... output"
+      if(_debug){
+        debugMsgPrefx();
+        Serial.print("IP: ");
+        Serial.println(WiFi.localIP());  
+      }
     }else{
       if(WiFi.status() != WL_CONNECTED){
         WiFi.reconnect();
@@ -122,28 +130,26 @@ bool startWifiStation(){
 void DoInAPMode(){
   if(InAPMode && !APModeSuccess){
     //Going into AP mode
-    if(_debug){
+    
     debugMsg("Entering AP mode.");
-    }
-    if(wifiConfig.hostname == DEFAULT_HOSTS_NAME){
-      String tempName = wifiConfig.hostname + String(getChipId()); 
-      strlcpy(wifiConfig.hostname,tempName.c_str(),sizeof(wifiConfig.hostname));
-    }
+    
+    
+    String tempName = wifiConfig.hostname + String(getChipId()); 
+    strlcpy(wifiConfig.hostname,tempName.c_str(),sizeof(wifiConfig.hostname));
+    
     WiFi.disconnect();
     WiFi.mode(WIFI_AP);
     delay(100);
     APModeSuccess = WiFi.softAP(wifiConfig.hostname, wifiConfig.apPassword);
+    
     if (APModeSuccess){
-      if(_debug){
-      debugMsgPrefx();Serial.print("SoftAP IP Address: ");
-      Serial.println(WiFi.softAPIP());
-      }
-      ReconnectWiFi.set(15000); //15 seconds
+      debugMsgPrefx();Serial.print("SoftAP IP Address: ");Serial.println(WiFi.softAPIP());
+      ReconnectWiFi.set(75000); //75 seconds unless someone connects.
     }else{
       APModeSuccess = true; // not really but if we do not do this, It will come though here and reset the reset delay every loop. 
-      if(_debug){
-      debugMsg("SoftAP mode Failed Rebooting in 15 seconds.");
-      }
+      
+      debugMsg("SoftAP mode Failed Rebooting in 15 seconds.Try using Serial connection to update WiFi settings.");
+      
       resetTimeDelay.set(15000UL); //trigger 15 sec
       needReset = true;
     }
@@ -152,22 +158,14 @@ void DoInAPMode(){
 
 void CheckWifi(){
    //check connection status
-  if(!InAPMode || InAPMode && !APModeSuccess){
-    
-    if(!isWiFiConnected()){
-      InAPMode = true; 
+   
+  if(InAPMode && !APModeSuccess){
       DoInAPMode();
-							 
-							   
-    }
-    
   }else{
     //only try to reconnect if no one has connected as an AP client.
     if(ReconnectWiFi.check() && WiFi.softAPgetStationNum() ==0){
         InAPMode = !startWifiStation(); //attempt to reconnect to the main wifi access point if it succeds, Set to false.
         APModeSuccess = false; //reset so it will do a full attempt to go into AP mode if called to
-    }else{
-      
     }
   }
   
@@ -194,7 +192,8 @@ void DebugwifiConfig(){
   debugMsgPrefx();Serial.print("wifiConfig.ssid: ");
   Serial.println(wifiConfig.ssid);
   debugMsgPrefx();Serial.print("wifiConfig.password: ");
-  Serial.println(wifiConfig.password);
+  Serial.println("*************");
+  //Serial.println(wifiConfig.password);
   debugMsgPrefx();Serial.print("wifiConfig.wifimode: ");
   Serial.println(wifiConfig.wifimode);
   debugMsgPrefx();Serial.print("wifiConfig.hostname: ");
@@ -204,7 +203,8 @@ void DebugwifiConfig(){
   debugMsgPrefx();Serial.print("wifiConfig.attemptdelay: ");
   Serial.println(wifiConfig.attemptdelay);
   debugMsgPrefx();Serial.print("wifiConfig.apPassword: ");
-  Serial.println(wifiConfig.apPassword);
+  Serial.println("*************");
+  //Serial.println(wifiConfig.apPassword);
 }
 
 String wifiConfigFile = "/config/wifiConfig.json";
@@ -216,7 +216,7 @@ bool loadwifiConfig()
   if (!SPIFFS.exists(wifiConfigFile))
   {
     if(_debug){
-    debugMsg("[WARNING]: wifiConfig file not found! Loading Factory Defaults.");
+      debugMsg("[WARNING]: wifiConfig file not found! Loading Factory Defaults.");
     }
     strlcpy(wifiConfig.ssid,"", sizeof(wifiConfig.ssid));
     strlcpy(wifiConfig.password, "", sizeof(wifiConfig.password));
@@ -256,8 +256,8 @@ bool loadwifiConfig()
     return false;
   }else{
     if(_debug){
-    debugMsg("wifiConfig was loaded successfully");
-    DebugwifiConfig();
+      debugMsg("wifiConfig was loaded successfully");
+      DebugwifiConfig();
     }
   }
   
@@ -293,9 +293,9 @@ bool savewifiConfig(WifiConfig newConfig)
   }else {
     wifiConfig = newConfig;
     if(_debug){
-    debugMsgPrefx();Serial.print("Characters witten: ");Serial.println(chrW);
-    debugMsg("wifiConfig was updated");
-    DebugwifiConfig();
+      debugMsgPrefx();Serial.print("Characters witten: ");Serial.println(chrW);
+      debugMsg("wifiConfig was updated");
+      DebugwifiConfig();
     }
   }
     
@@ -307,19 +307,19 @@ bool savewifiConfig(WifiConfig newConfig)
 void SetupWifi(){
   if(loadwifiConfig()){
     if(_debug){
-    debugMsg("WiFi Config Loaded");
+      debugMsg("WiFi Config Loaded");
     }
     debugMsgPrefx();Serial.print("WifiMode:");
     Serial.println(wifiConfig.wifimode);
     if(wifiConfig.wifimode == "WIFI_AP"){
       InAPMode  = true;
-      
     }else{
       InAPMode  = false;
     }
+      
   }else{
     if(_debug){
-    debugMsg("WiFi Config Failed to Load");
+      debugMsg("WiFi Config Failed to Load");
     }
     InAPMode  = true;
   }
@@ -331,7 +331,7 @@ void SetupWifi(){
     startWifiStation();
   }
   if(_debug){
-  debugMsg("Wifi Setup complete");
+    debugMsg("Wifi Setup complete");
   }
 }
 
@@ -355,6 +355,7 @@ void PrintNetStat(){
 }
 
 void DebugSettingsConfig(){
+  
   debugMsgPrefx();Serial.print("settingsConfig.OPURI: ");
   Serial.println(settingsConfig.OPURI);
   
@@ -374,7 +375,7 @@ void DebugSettingsConfig(){
 String settingsConfigFile = "/config/settingsConfig.json";
 bool loadSettings(){
   if(_debug){
-  debugMsgPrefx();Serial.print("SettingsConfig file path: ");Serial.println(settingsConfigFile);
+    debugMsgPrefx();Serial.print("SettingsConfig file path: ");Serial.println(settingsConfigFile);
   }
   
   if (!SPIFFS.exists(settingsConfigFile))
@@ -398,7 +399,9 @@ bool loadSettings(){
   strlcpy(settingsConfig.OPURI, doc["OPURI"] | "FAILED", sizeof(settingsConfig.OPURI));
   
   int OPPort = doc["OPPort"] | 5000 ;
+  
   settingsConfig.OPPort = OPPort;
+  
   
   strlcpy(settingsConfig.OPAK, doc["OPAK"] | "FAILED", sizeof(settingsConfig.OPAK));
 
@@ -417,8 +420,8 @@ bool loadSettings(){
     return false;
   }else{
     if(_debug){
-    debugMsg("SettingsConfig was loaded successfully");
-    DebugSettingsConfig();
+      debugMsg("SettingsConfig was loaded successfully");
+      DebugSettingsConfig();
     }
   }
   
@@ -451,11 +454,9 @@ bool saveSettings(SettingsConfig newSettings){
     return false;
   }else {
     settingsConfig = newSettings;
-    if(_debug){
     debugMsgPrefx();Serial.print("Characters witten: ");Serial.println(chrW);
     debugMsg("settingsConfig was updated");
     DebugSettingsConfig();
-    }
   }
     
   file.close();

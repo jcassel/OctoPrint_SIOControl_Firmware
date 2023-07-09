@@ -2,7 +2,7 @@
 //Takes serial commands to control configured IO.
 //Reports IO status created for use with OctoPrint_SIOControl_plugin
 
-#define ENABLE_WIFI_SUPPORT
+//#define ENABLE_WIFI_SUPPORT
 #include <Bounce2.h>
 #include "FS.h"
 #include <ArduinoJson.h> 
@@ -10,7 +10,7 @@
 #include "global.h"
 #define _GDebug 
 #define USE_DIGESTAUTH
-#define VERSIONINFO "SIO_ESP12F_Relay_X2 1.0.8"
+#define VERSIONINFO "SIO_ESP12F_Relay_X2 1.0.9"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #define DEFAULT_HOSTS_NAME "SIOControler-New"
 #include "TimeRelease.h"
@@ -29,10 +29,6 @@
 #include "webPages.h"
 
 
-
-bool isOutPut(int IOP){
-  return IOType[IOP] == OUTPUT; 
-}
 
 void ConfigIO(){
   
@@ -61,9 +57,9 @@ unsigned long reportInterval = 3000;
 
 void setup() {
   delay(100);
-  #ifdef _GDebug
+  if(_debug){
     _debug = true;
-  #endif
+  }
   
   Serial.begin(115200);
   delay(300);
@@ -102,17 +98,23 @@ void setup() {
   
   
   if(!loadSettings()){
-    #ifdef _debug
-    Serial.println("Settings Config Loaded");
-    #endif
+    if(_debug){
+      Serial.println("Settings failed to load");
+    }
+  }else{
+    if(_debug){
+      Serial.println("Settings loaded from filesystem.");
+      DebugSettingsConfig();
+    }
   }
   
+  #ifdef ENABLE_WIFI_SUPPORT
   debugMsg("begin init pages");
   initialisePages();
   debugMsg("end init pages");
   webServer.begin();
   debugMsg("end webserver.begin");
-
+  #endif
   
 }
 
@@ -143,9 +145,9 @@ void reportIO(bool forceReport){
   if (IOReport.check()||forceReport){
     Serial.print("IO:");
     for (int i=0;i<IOSize;i++){
-      if(IOType[i] == 1 ){ //if it is an output
+      //if(IOType[i] == 1 ){ //if it is an output
         IO[i] = digitalRead(IOMap[i]);  
-      }
+      //}
       Serial.print(IO[i]);
     }
     Serial.println();
@@ -183,7 +185,8 @@ bool checkIO(){
 void reportIOTypes(){
   Serial.print("IT:");
   for (int i=0;i<IOSize;i++){
-    Serial.print(IOType[i]);
+    Serial.print(String(IOType[i]));
+    Serial.print(",");
     //if(i<IOSize-1){Serial.print(";");}
   }
   Serial.println();
@@ -433,7 +436,6 @@ void checkSerial(){
     }
   }
 }
-
 void ack(){
   Serial.println("OK");
 }
@@ -467,7 +469,6 @@ int getIOType(String typeName){
   if(typeName == "INPUT_PULLDOWN"){debugMsg("IO type incompatible with this MCU");return 0;} //not avalible in esp8266
   if(typeName == "OUTPUT_OPEN_DRAIN"){return 3;} //not sure on this value have to double check
 }
-
 
 bool loadIOConfig(){
   

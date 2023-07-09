@@ -1,3 +1,5 @@
+#include <ArduinoJson.h>  
+
 String LastStatus = "Ready!"; //latest status message.
 String Networks = "";
 
@@ -41,29 +43,29 @@ void storeWifiScanResult(int networksFound) {
       Networks += "%)\"";
     }
     if(_debug){
-      debugMsgPrefx();Serial.printf("%d: %s, Ch:%d (%ddBm) %s\n", i + 1, WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), WiFi.encryptionType(i) == ENC_TYPE_NONE ? "open" : "");
+      debugMsgPrefx();Serial.printf("%d: %s, Ch:%d (%ddBm) %s\n", i + 1, WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "open" : "");
     }
     
   }
   
   Networks += "]}";
   
-  //WiFi.scanDelete(); not supported for esp8266
+  WiFi.scanDelete(); //not supported for esp8266
   
 }
 
 const char* www_realm = "admin@SIOControl";
 String authFailResponse = "Authentication Failed";
-
 bool checkAuth(){
   
   if(!webServer.authenticate(www_username,wifiConfig.apPassword)){
     #ifdef USE_DIGESTAUTH
     webServer.requestAuthentication(DIGEST_AUTH, www_realm, authFailResponse);
-    if(_debug){
-      debugMsgPrefx();Serial.print("AuthFailed?:");
-      Serial.println(authFailResponse);
-    }
+      if(_debug){
+        debugMsgPrefx();
+        Serial.print("AuthFailed?:");
+        Serial.println(authFailResponse);
+      }
     #else
     webServer.requestAuthentication();
     #endif
@@ -80,12 +82,13 @@ bool handleFileRead(String path) {
     return false;
     
   if(_debug){
-    debugMsg("start handleFileRead");
+    debugMsgPrefx();Serial.println("start handleFileRead");
   }
   
   if (SPIFFS.exists(path)) {
     if(_debug){
-      debugMsgPrefx();Serial.print("File found:");
+      debugMsgPrefx();
+      Serial.print("File found:");
       Serial.println(path);
     }
     File file = SPIFFS.open(path, "r");
@@ -98,7 +101,8 @@ bool handleFileRead(String path) {
     return true;
   }else{
     if(_debug){
-      debugMsgPrefx();Serial.print("File not found");
+      debugMsgPrefx();
+      Serial.print("File not found");
       Serial.println(path);
     }
   }
@@ -107,7 +111,7 @@ bool handleFileRead(String path) {
 
 void initialisePages(){
   if(_debug){
-    debugMsg("Initializing pages start");
+    debugMsgPrefx();Serial.println("Initializing pages start");
   }
   webServer.serveStatic("/config.js",SPIFFS,"/config.js");//.setAuthentication(www_username,wifiConfig.apPassword);
   webServer.serveStatic("/ioconfig.js",SPIFFS,"/ioconfig.js");//.setAuthentication(www_username,wifiConfig.apPassword);
@@ -135,7 +139,7 @@ void initialisePages(){
     handleFileRead("/ioconfig.htm");
     
     if(_debug){
-    debugMsg("end ioconfig");
+      debugMsg("end ioconfig");
     }
   });
   
@@ -145,12 +149,13 @@ void initialisePages(){
     settings += "\"LastStatus\":\"" + LastStatus + "\"";
     settings += ",\"hostname\":\"" + String(wifiConfig.hostname) + "\"";
     settings += ",\"firmwareV\":\"" + String(VERSIONINFO)+ "\"";
-
-    for (int i=0;i<IOSize;i++){
-    settings += ",\"io" +String(i) +"_type\":\"" + IOType[i]+ "\"";      
+    settings += ",\"IO\":{";
+    settings += "\"io0_type\":\"" + String(IOType[0]) + "\""; //initial item (no comma)      
+    for (int i=1;i<IOSize;i++){
+      settings += ",\"io" +String(i) +"_type\":\"" + IOType[i]+ "\"";      
     }
 
-    settings += "}}";
+    settings += "}}}";
     webServer.send(200, "application/json", settings);
   });
   
@@ -203,7 +208,7 @@ void initialisePages(){
     storeWifiScanResult(n);
     doWiFiScan = true;
     if(_debug){
-      debugMsgPrefx();Serial.print("Network Scanned requested:");
+      debugMsg("Network Scan requested");
     }
     webServer.send(200, "text/plain","OK" );
   });
@@ -245,9 +250,12 @@ void initialisePages(){
       if(_debug){
         debugMsg("AfterUpdate: wificonfig");
         DebugwifiConfig();
+        debugMsg("before direct Update: SettingsConfig");
+        DebugSettingsConfig(); //prints the settings struct to the Serial line
       }
       
-
+      
+      
       //MQTT settings (future)
       /*
       mqttConfig.MQTTEN = webServer.arg("ch_MQTTEN").toInt();
@@ -264,10 +272,10 @@ void initialisePages(){
       settingsConfig.TimeZoneOffsetHours = webServer.arg("tx_TZOS").toInt();
 
 
-      if(_debug){
-        debugMsg("AfterUpdate: SettingsConfig");
-        DebugSettingsConfig(); //prints the settings struct to the Serial line
-      }
+      
+      debugMsg("After direct Update: SettingsConfig");
+      DebugSettingsConfig(); //prints the settings struct to the Serial line
+      
       
       savewifiConfig(wifiConfig);
       saveSettings(settingsConfig);
@@ -288,7 +296,7 @@ void initialisePages(){
     
     handleFileRead("/config.htm");
     if(_debug){
-    debugMsg("end post config");
+      debugMsg("end post config");
     }
     
   });
@@ -299,22 +307,18 @@ void initialisePages(){
     if(webServer.hasArg("update")){
       if(_debug){
         debugMsg("updating ioconfig");
-      }
+      } 
       
       String newIOConfig = "";
-      newIOConfig += webServer.arg("cbo_io0_type");
-      newIOConfig += webServer.arg("cbo_io1_type");
-      newIOConfig += webServer.arg("cbo_io2_type");
-      newIOConfig += webServer.arg("cbo_io3_type");
-      newIOConfig += webServer.arg("cbo_io4_type");
-      newIOConfig += webServer.arg("cbo_io5_type");
-      newIOConfig += webServer.arg("cbo_io6_type");
+      for (int i=0;i<IOSize;i++){      
+        newIOConfig += webServer.arg("cbo_io"+String(i)+"_type");
+      }
 
       if(_debug){
         debugMsgPrefx();Serial.print("New IO String:");
         Serial.println(newIOConfig);
       }
-      
+
       updateIOConfig(newIOConfig);
       StoreIOConfig();
       
@@ -327,9 +331,12 @@ void initialisePages(){
     }
     
   });
+  
   webServer.on("/ioControl/status",HTTP_GET,[]{
     if(!checkAuth()){return;}
-
+    if(_debug){
+      debugMsg("[net] ioControl/status Called");
+    }
     String ioData = "{\"IO\":{";
     ioData += "\"io0\":\"" + String(IO[0]) + "\""; //initial item (no comma)      
     for (int i=1;i<IOSize;i++){
@@ -375,5 +382,6 @@ void initialisePages(){
           
       }
   });
+  
   
 }
