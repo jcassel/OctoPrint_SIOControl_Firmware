@@ -9,6 +9,7 @@ document.getElementById("action").classList.remove('hidden');
 GetSettings();
 });
 
+
 function toggleAccessPassword(){
 	var el = document.getElementById("tx_APW");
 	togglePassword(el);

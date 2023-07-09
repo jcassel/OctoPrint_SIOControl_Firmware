@@ -17,7 +17,16 @@
 		  
 		  <div  id="main" class="main ">
 			<form id="frm" class="frm" method='POST' action='/ioconfig'>
-			<table border="1" id="ioPoints" ></table>		
+			<table >
+			<tr><th>IO POINT</th><th>IO POINT Type</th>
+			<tr><td>IO-0</td><td><select name="cbo_io0_type" id="cbo_io0_type"><option value="1">OUTPUT</option><option value="3">OUTPUT_OPEN_DRAIN</option><option value="0">INPUT</option><option value="2">INPUT_PULLUP</option></select></td></tr>
+			<tr><td>IO-1</td><td><select name="cbo_io1_type" id="cbo_io1_type"><option value="1">OUTPUT</option><option value="3">OUTPUT_OPEN_DRAIN</option><option value="0">INPUT</option><option value="2">INPUT_PULLUP</option></select></td></tr>
+			<tr><td>IO-2</td><td><select name="cbo_io2_type" id="cbo_io2_type"><option value="1">OUTPUT</option><option value="3">OUTPUT_OPEN_DRAIN</option><option value="0">INPUT</option><option value="2">INPUT_PULLUP</option></select></td></tr>
+			<tr><td>IO-3</td><td><select name="cbo_io3_type" id="cbo_io3_type"><option value="1">OUTPUT</option><option value="3">OUTPUT_OPEN_DRAIN</option><option value="0">INPUT</option><option value="2">INPUT_PULLUP</option></select></td></tr>
+			<tr><td>IO-4</td><td><select name="cbo_io4_type" id="cbo_io4_type"><option value="1">OUTPUT</option><option value="3">OUTPUT_OPEN_DRAIN</option><option value="0">INPUT</option><option value="2">INPUT_PULLUP</option></select></td></tr>
+			<tr><td>IO-5</td><td><select name="cbo_io5_type" id="cbo_io5_type"><option value="1">OUTPUT</option><option value="3">OUTPUT_OPEN_DRAIN</option><option value="0">INPUT</option><option value="2">INPUT_PULLUP</option></select></td></tr>
+			<tr><td>IO-6</td><td><select name="cbo_io6_type" id="cbo_io6_type"><option value="1">OUTPUT</option><option value="3">OUTPUT_OPEN_DRAIN</option><option value="0">INPUT</option><option value="2">INPUT_PULLUP</option></select></td></tr>
+			</table>		
 			<h4><div><input type='submit' name='update' value='Update'/> </div></h4>
 			<h4><div><input type='submit' name='reboot' value='Reboot'/> </div></h4>
 			<h4>Status:<span id="status"></span></h4>

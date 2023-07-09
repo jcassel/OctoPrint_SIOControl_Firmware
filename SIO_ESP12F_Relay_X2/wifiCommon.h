@@ -49,27 +49,27 @@ bool isWiFiConnected(bool debug=true){
 
   if(lastWifiStatus !=WiFi.status()){ // should only print out the status when it changes.
     lastWifiStatus =WiFi.status();
-    #ifdef _GDebug
-      Serial.print("WiFi Status: ");
+    if(_debug){
+      debugMsgPrefx();Serial.print("WiFi Status: ");
       Serial.println(WiFi.status());
-    #endif
+    }
   }
   return (WiFi.status() == WL_CONNECTED);
 }
 
 
 bool startWifiStation(){
-  #ifdef _GDebug
-  Serial.printf("[INFO]: Connecting to %s\n", wifiConfig.ssid);
-  Serial.printf("Existing set WiFi.SSID:%s\n",WiFi.SSID().c_str());
-  Serial.printf("wifiConfig.ssid:%s\n",wifiConfig.ssid);
-  #endif
+  if(_debug){
+    debugMsgPrefx();Serial.printf("[INFO]: Connecting to %s\n", wifiConfig.ssid);
+    debugMsgPrefx();Serial.printf("Existing set WiFi.SSID:%s\n",WiFi.SSID().c_str());
+    debugMsgPrefx();Serial.printf("wifiConfig.ssid:%s\n",wifiConfig.ssid);
+  }
   if(String(wifiConfig.wifimode) == "WIFI_STA"){
     if ( String(WiFi.SSID()) != String(wifiConfig.ssid) || WifiInitialized == false)
     {
-        #ifdef _GDebug
-        Serial.println("initiallizing WiFi Connection");
-        #endif
+        if(_debug){
+          debugMsg("initiallizing WiFi Connection");
+        }
         if(isWiFiConnected()){
           WiFi.disconnect();
         }
@@ -79,6 +79,7 @@ bool startWifiStation(){
         WiFi.begin(wifiConfig.ssid, wifiConfig.password);
         WifiInitialized = true;
         uint8_t attempts = wifiConfig.attempts;
+        debugMsgPrefx();Serial.print("connecting ."); //dots per try "..."
         while (!isWiFiConnected())
         {
           if(attempts == 0) {
@@ -92,9 +93,10 @@ bool startWifiStation(){
           Serial.print(".");
           attempts--;
        }
-       #ifdef _GDebugbug
-       Serial.println(WiFi.localIP());  
-       #endif
+       if(_debug){
+         debugMsgPrefx();Serial.print("IP: ");
+         Serial.println(WiFi.localIP());  
+       }
     }else{
       if(WiFi.status() != WL_CONNECTED){
         WiFi.reconnect();
@@ -105,12 +107,12 @@ bool startWifiStation(){
     
     return false; //In AP mode.. should not be connecting.
   }
-  #ifdef _GDebug
-  Serial.print("WiFi.Status(): ");
-  Serial.println(String(WiFi.status()));
-  Serial.print("WL_CONNECTED: ");
-  Serial.println(String(WL_CONNECTED));
-  #endif
+  if(_debug){
+    debugMsgPrefx();Serial.print("WiFi.Status(): ");
+    Serial.println(String(WiFi.status()));
+    debugMsgPrefx();Serial.print("WL_CONNECTED: ");
+    Serial.println(String(WL_CONNECTED));
+  }
   //needMqttConnect = (WiFi.status() == WL_CONNECTED); //get the MQtt System to connect once wifi is connected.
   return (WiFi.status() == WL_CONNECTED);
 }
@@ -120,9 +122,9 @@ bool startWifiStation(){
 void DoInAPMode(){
   if(InAPMode && !APModeSuccess){
     //Going into AP mode
-    #ifdef _GDebug
-    Serial.println("Entering AP mode.");
-    #endif
+    if(_debug){
+    debugMsg("Entering AP mode.");
+    }
     if(wifiConfig.hostname == DEFAULT_HOSTS_NAME){
       String tempName = wifiConfig.hostname + String(getChipId()); 
       strlcpy(wifiConfig.hostname,tempName.c_str(),sizeof(wifiConfig.hostname));
@@ -132,16 +134,16 @@ void DoInAPMode(){
     delay(100);
     APModeSuccess = WiFi.softAP(wifiConfig.hostname, wifiConfig.apPassword);
     if (APModeSuccess){
-      #ifdef _GDebug
-      Serial.print("SoftAP IP Address: ");
+      if(_debug){
+      debugMsgPrefx();Serial.print("SoftAP IP Address: ");
       Serial.println(WiFi.softAPIP());
-      #endif
+      }
       ReconnectWiFi.set(15000); //15 seconds
     }else{
       APModeSuccess = true; // not really but if we do not do this, It will come though here and reset the reset delay every loop. 
-      #ifdef _GDebug
-      Serial.println("SoftAP mode Failed Rebooting in 15 seconds.");
-      #endif
+      if(_debug){
+      debugMsg("SoftAP mode Failed Rebooting in 15 seconds.");
+      }
       resetTimeDelay.set(15000UL); //trigger 15 sec
       needReset = true;
     }
@@ -189,33 +191,33 @@ String IpAddress2String(const IPAddress& ipAddress)
 }
 
 void DebugwifiConfig(){
-  Serial.print("wifiConfig.ssid: ");
+  debugMsgPrefx();Serial.print("wifiConfig.ssid: ");
   Serial.println(wifiConfig.ssid);
-  Serial.print("wifiConfig.password: ");
+  debugMsgPrefx();Serial.print("wifiConfig.password: ");
   Serial.println(wifiConfig.password);
-  Serial.print("wifiConfig.wifimode: ");
+  debugMsgPrefx();Serial.print("wifiConfig.wifimode: ");
   Serial.println(wifiConfig.wifimode);
-  Serial.print("wifiConfig.hostname: ");
+  debugMsgPrefx();Serial.print("wifiConfig.hostname: ");
   Serial.println(wifiConfig.hostname);
-  Serial.print("wifiConfig.attempts: ");
+  debugMsgPrefx();Serial.print("wifiConfig.attempts: ");
   Serial.println(wifiConfig.attempts);
-  Serial.print("wifiConfig.attemptdelay: ");
+  debugMsgPrefx();Serial.print("wifiConfig.attemptdelay: ");
   Serial.println(wifiConfig.attemptdelay);
-  Serial.print("wifiConfig.apPassword: ");
+  debugMsgPrefx();Serial.print("wifiConfig.apPassword: ");
   Serial.println(wifiConfig.apPassword);
 }
 
 String wifiConfigFile = "/config/wifiConfig.json";
 bool loadwifiConfig()
 {
-  #ifdef _GDebug
-    Serial.print("wifiConfig file path: ");Serial.println(wifiConfigFile);
-  #endif
+  if(_debug){
+    debugMsgPrefx();Serial.print("wifiConfig file path: ");Serial.println(wifiConfigFile);
+  }
   if (!SPIFFS.exists(wifiConfigFile))
   {
-    #ifdef _GDebug
-    Serial.println("[WARNING]: wifiConfig file not found! Loading Factory Defaults.");
-    #endif
+    if(_debug){
+    debugMsg("[WARNING]: wifiConfig file not found! Loading Factory Defaults.");
+    }
     strlcpy(wifiConfig.ssid,"", sizeof(wifiConfig.ssid));
     strlcpy(wifiConfig.password, "", sizeof(wifiConfig.password));
     
@@ -249,14 +251,14 @@ bool loadwifiConfig()
 
   if (error)
   {
-    Serial.println("[ERROR]: deserializeJson() error in loadwifiConfig");
-    Serial.println(error.c_str());
+    debugMsg("[ERROR]: deserializeJson() error in loadwifiConfig");
+    debugMsg(error.c_str());
     return false;
   }else{
-    #ifdef _GDebug
-    Serial.println("wifiConfig was loaded successfully");
+    if(_debug){
+    debugMsg("wifiConfig was loaded successfully");
     DebugwifiConfig();
-    #endif
+    }
   }
   
 
@@ -266,9 +268,9 @@ bool loadwifiConfig()
 
 bool savewifiConfig(WifiConfig newConfig)
 {
-  #ifdef _GDebug
-    Serial.print("wifiConfig file path: ");Serial.println(wifiConfigFile);
-  #endif
+  if(_debug){
+    debugMsgPrefx();Serial.print("wifiConfig file path: ");Serial.println(wifiConfigFile);
+  }
   SPIFFS.remove(wifiConfigFile);
   File file = SPIFFS.open(wifiConfigFile, "w");
 
@@ -286,15 +288,15 @@ bool savewifiConfig(WifiConfig newConfig)
   int chrW = serializeJsonPretty(doc, file);
   if (chrW == 0)
   {
-    Serial.println("[WARNING]: Failed to write to webconfig file");
+    debugMsg("[WARNING]: Failed to write to webconfig file");
     return false;
   }else {
     wifiConfig = newConfig;
-    #ifdef _GDebug
-    Serial.print("Characters witten: ");Serial.println(chrW);
-    Serial.println("wifiConfig was updated");
+    if(_debug){
+    debugMsgPrefx();Serial.print("Characters witten: ");Serial.println(chrW);
+    debugMsg("wifiConfig was updated");
     DebugwifiConfig();
-    #endif
+    }
   }
     
   file.close();
@@ -304,38 +306,47 @@ bool savewifiConfig(WifiConfig newConfig)
 
 void SetupWifi(){
   if(loadwifiConfig()){
-    #ifdef _GDebug
-    Serial.println("WiFi Config Loaded");
-    #endif
-    InAPMode  = false;
+    if(_debug){
+    debugMsg("WiFi Config Loaded");
+    }
+    debugMsgPrefx();Serial.print("WifiMode:");
+    Serial.println(wifiConfig.wifimode);
+    if(wifiConfig.wifimode == "WIFI_AP"){
+      InAPMode  = true;
+      
+    }else{
+      InAPMode  = false;
+    }
   }else{
-    #ifdef _GDebug
-    Serial.println("WiFi Config Failed to Load");
-    #endif
+    if(_debug){
+    debugMsg("WiFi Config Failed to Load");
+    }
     InAPMode  = true;
   }
   if(InAPMode){
+    debugMsg("Doing InAPMode");
     DoInAPMode();
   }else{
+    debugMsg("Doing startWifiStation");
     startWifiStation();
   }
-  #ifdef _GDebug
-  Serial.println("Wifi Setup complete");
-  #endif
+  if(_debug){
+  debugMsg("Wifi Setup complete");
+  }
 }
 
 void PrintNetStat(){
+  debugMsgPrefx();
   Serial.print("Is Wifi Connected: ");
-  Serial.println();
   if (isWiFiConnected(false)){
     Serial.println("yes");
-    Serial.print("IP:");
+    debugMsgPrefx();Serial.print("IP:");
     Serial.println(WiFi.localIP());
     
-    Serial.print("SubNet:");
+    debugMsgPrefx();Serial.print("SubNet:");
     Serial.println(WiFi.subnetMask());
 
-    Serial.print("Gateway:");
+    debugMsgPrefx();Serial.print("Gateway:");
     Serial.println(WiFi.gatewayIP());
     //would like to add other info here. Things like gateway and dns server and Maybe MQTT info
   }else{
@@ -344,33 +355,33 @@ void PrintNetStat(){
 }
 
 void DebugSettingsConfig(){
-  Serial.print("settingsConfig.OPURI: ");
+  debugMsgPrefx();Serial.print("settingsConfig.OPURI: ");
   Serial.println(settingsConfig.OPURI);
   
-  Serial.print("settingsConfig.OPPort: ");
+  debugMsgPrefx();Serial.print("settingsConfig.OPPort: ");
   Serial.println(settingsConfig.OPPort);
   
-  Serial.print("settingsConfig.OPAK: ");
+  debugMsgPrefx();Serial.print("settingsConfig.OPAK: ");
   Serial.println(settingsConfig.OPAK);
 
-  Serial.print("settingsConfig.StatusIntervalSec: ");
+  debugMsgPrefx();Serial.print("settingsConfig.StatusIntervalSec: ");
   Serial.println(settingsConfig.StatusIntervalSec);
 
-  Serial.print("settingsConfig.TimeZoneOffsetHours: ");
+  debugMsgPrefx();Serial.print("settingsConfig.TimeZoneOffsetHours: ");
   Serial.println(settingsConfig.TimeZoneOffsetHours);
 }
 
 String settingsConfigFile = "/config/settingsConfig.json";
 bool loadSettings(){
-  #ifdef _GDebug
-  Serial.print("SettingsConfig file path: ");Serial.println(settingsConfigFile);
-  #endif
+  if(_debug){
+  debugMsgPrefx();Serial.print("SettingsConfig file path: ");Serial.println(settingsConfigFile);
+  }
   
   if (!SPIFFS.exists(settingsConfigFile))
   {
-    #ifdef _GDebug
-    Serial.println("[WARNING]: SettingsConfig file not found! Loading Factory Defaults.");
-    #endif
+    if(_debug){
+    debugMsg("[WARNING]: SettingsConfig file not found! Loading Factory Defaults.");
+    }
     
     strlcpy(settingsConfig.OPURI,"", sizeof(settingsConfig.OPURI));
     settingsConfig.OPPort = 5000 ; //set to install default (maybe this should default to 80)
@@ -401,14 +412,14 @@ bool loadSettings(){
 
   if (error)
   {
-    Serial.println("[ERROR]: deserializeJson() error in loadSettings");
-    Serial.println(error.c_str());
+    debugMsg("[ERROR]: deserializeJson() error in loadSettings");
+    debugMsg(error.c_str());
     return false;
   }else{
-    #ifdef _GDebug
-    Serial.println("SettingsConfig was loaded successfully");
+    if(_debug){
+    debugMsg("SettingsConfig was loaded successfully");
     DebugSettingsConfig();
-    #endif
+    }
   }
   
 
@@ -416,9 +427,9 @@ bool loadSettings(){
 }
 
 bool saveSettings(SettingsConfig newSettings){
-  #ifdef _GDebug
-    Serial.print("settingsConfig file path: ");Serial.println(settingsConfigFile);
-  #endif
+  if(_debug){
+    debugMsgPrefx();Serial.print("settingsConfig file path: ");Serial.println(settingsConfigFile);
+  }
   
   SPIFFS.remove(settingsConfigFile);
   File file = SPIFFS.open(settingsConfigFile, "w");
@@ -436,15 +447,15 @@ bool saveSettings(SettingsConfig newSettings){
   int chrW = serializeJsonPretty(doc, file);
   if (chrW == 0)
   {
-    Serial.println("[WARNING]: Failed to write to settingsConfi file");
+    debugMsg("[WARNING]: Failed to write to settingsConfi file");
     return false;
   }else {
     settingsConfig = newSettings;
-    #ifdef _GDebug
-    Serial.print("Characters witten: ");Serial.println(chrW);
-    Serial.println("settingsConfig was updated");
+    if(_debug){
+    debugMsgPrefx();Serial.print("Characters witten: ");Serial.println(chrW);
+    debugMsg("settingsConfig was updated");
     DebugSettingsConfig();
-    #endif
+    }
   }
     
   file.close();

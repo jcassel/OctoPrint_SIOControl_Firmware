@@ -40,9 +40,9 @@ void storeWifiScanResult(int networksFound) {
       Networks += dBmtoPercentage(WiFi.RSSI(i));
       Networks += "%)\"";
     }
-    #ifdef _debugopra
-    Serial.printf("%d: %s, Ch:%d (%ddBm) %s\n", i + 1, WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), WiFi.encryptionType(i) == ENC_TYPE_NONE ? "open" : "");
-    #endif
+    if(_debug){
+      debugMsgPrefx();Serial.printf("%d: %s, Ch:%d (%ddBm) %s\n", i + 1, WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), WiFi.encryptionType(i) == ENC_TYPE_NONE ? "open" : "");
+    }
     
   }
   
@@ -52,17 +52,18 @@ void storeWifiScanResult(int networksFound) {
   
 }
 
-const char* www_realm = "Login Required";
+const char* www_realm = "admin@SIOControl";
 String authFailResponse = "Authentication Failed";
+
 bool checkAuth(){
   
   if(!webServer.authenticate(www_username,wifiConfig.apPassword)){
     #ifdef USE_DIGESTAUTH
     webServer.requestAuthentication(DIGEST_AUTH, www_realm, authFailResponse);
-      #ifdef _GDebug
-      Serial.print("AuthFailed?:");
+    if(_debug){
+      debugMsgPrefx();Serial.print("AuthFailed?:");
       Serial.println(authFailResponse);
-      #endif
+    }
     #else
     webServer.requestAuthentication();
     #endif
@@ -78,15 +79,15 @@ bool handleFileRead(String path) {
   if(!checkAuth())
     return false;
     
-  #ifdef _GDebug
-  Serial.println("start handleFileRead");
-  #endif
+  if(_debug){
+    debugMsg("start handleFileRead");
+  }
   
   if (SPIFFS.exists(path)) {
-    #ifdef _GDebug
-    Serial.print("File found:");
-    Serial.println(path);
-    #endif
+    if(_debug){
+      debugMsgPrefx();Serial.print("File found:");
+      Serial.println(path);
+    }
     File file = SPIFFS.open(path, "r");
     if(path.endsWith("css")){
       webServer.streamFile(file, "text/css");
@@ -96,18 +97,18 @@ bool handleFileRead(String path) {
     file.close();
     return true;
   }else{
-    #ifdef _GDebug
-    Serial.print("File not found");
-    Serial.println(path);
-    #endif
+    if(_debug){
+      debugMsgPrefx();Serial.print("File not found");
+      Serial.println(path);
+    }
   }
   return false;
 }
 
 void initialisePages(){
-  #ifdef _GDebug
-  Serial.println("Initializing pages start");
-  #endif
+  if(_debug){
+    debugMsg("Initializing pages start");
+  }
   webServer.serveStatic("/config.js",SPIFFS,"/config.js");//.setAuthentication(www_username,wifiConfig.apPassword);
   webServer.serveStatic("/ioconfig.js",SPIFFS,"/ioconfig.js");//.setAuthentication(www_username,wifiConfig.apPassword);
   webServer.serveStatic("/style.css",SPIFFS,"/style.css");//.setAuthentication(www_username,wifiConfig.apPassword);//31536000
@@ -115,27 +116,27 @@ void initialisePages(){
   
   
   webServer.on("/config",HTTP_GET,[]{
-    #ifdef _GDebug
-    Serial.println("start config");
-    #endif
+    if(_debug){
+      debugMsg("start config");
+    }
     
     handleFileRead("/config.htm");
     
-    #ifdef _GDebug
-    Serial.println("end config");
-    #endif
+    if(_debug){
+      debugMsg("end config");
+    }
   });
 
   webServer.on("/ioconfig",HTTP_GET,[]{
-    #ifdef _GDebug
-    Serial.println("start ioconfig");
-    #endif
+    if(_debug){
+      debugMsg("start ioconfig");
+    }
     
     handleFileRead("/ioconfig.htm");
     
-    #ifdef _GDebug
-    Serial.println("end ioconfig");
-    #endif
+    if(_debug){
+    debugMsg("end ioconfig");
+    }
   });
   
   webServer.on("/APIGetIOSettings",HTTP_GET,[]{
@@ -201,23 +202,23 @@ void initialisePages(){
     int n = WiFi.scanNetworks();
     storeWifiScanResult(n);
     doWiFiScan = true;
-    #ifdef _GDebug
-    Serial.print("Network Scanned requested:");
-    #endif
+    if(_debug){
+      debugMsgPrefx();Serial.print("Network Scanned requested:");
+    }
     webServer.send(200, "text/plain","OK" );
   });
 
   webServer.on("/APIGetNetworks",HTTP_GET,[]{
   if(!checkAuth()){return;}
     if(Networks.length() == 0){
-      #ifdef _GDebug
-      Serial.println("Sending Empty Network list");
-      #endif
+      if(_debug){
+        debugMsg("Sending Empty Network list");
+      }
       webServer.send(200, "application/json", "{\"networks\":[]}");
     }else{
-      #ifdef _GDebug
-      Serial.println("Sending Network list");
-      #endif
+      if(_debug){
+        debugMsg("Sending Network list");
+      }
       
       webServer.send(200, "application/json", Networks);
       Networks = "";  
@@ -228,9 +229,9 @@ void initialisePages(){
     if(!checkAuth()){return;}
 
     if(webServer.hasArg("update")){
-      #ifdef _GDebug
-      Serial.println("updating settings");
-      #endif
+      if(_debug){
+        debugMsg("updating settings");
+      }
 
       strlcpy(wifiConfig.wifimode, webServer.arg("cbo_WFMD").c_str(), sizeof(wifiConfig.wifimode));
       strlcpy(wifiConfig.hostname, webServer.arg("tx_HNAM").c_str(), sizeof(wifiConfig.hostname));
@@ -241,10 +242,10 @@ void initialisePages(){
       strlcpy(wifiConfig.apPassword, webServer.arg("tx_APW").c_str(), sizeof(wifiConfig.apPassword));
       
       
-      #ifdef _GDebug
-      Serial.println("AfterUpdate: wificonfig");
-      DebugwifiConfig();
-      #endif
+      if(_debug){
+        debugMsg("AfterUpdate: wificonfig");
+        DebugwifiConfig();
+      }
       
 
       //MQTT settings (future)
@@ -263,10 +264,10 @@ void initialisePages(){
       settingsConfig.TimeZoneOffsetHours = webServer.arg("tx_TZOS").toInt();
 
 
-      #ifdef _GDebug
-      Serial.println("AfterUpdate: SettingsConfig");
-      DebugSettingsConfig(); //prints the settings struct to the Serial line
-      #endif 
+      if(_debug){
+        debugMsg("AfterUpdate: SettingsConfig");
+        DebugSettingsConfig(); //prints the settings struct to the Serial line
+      }
       
       savewifiConfig(wifiConfig);
       saveSettings(settingsConfig);
@@ -275,9 +276,9 @@ void initialisePages(){
       LastStatus = "Update Completed(Ready!)";
       
     }else if(webServer.hasArg("reboot")){
-      #ifdef _GDebug
-      Serial.println("web called a reboot");
-      #endif
+      if(_debug){
+        debugMsg("web called a reboot");
+      }
       
       LastStatus = "Rebooting in 5 Sec";
       resetTimeDelay.set(10000UL); //need to give it more time so that the web page shows the message.
@@ -286,9 +287,9 @@ void initialisePages(){
     }
     
     handleFileRead("/config.htm");
-    #ifdef _GDebug
-    Serial.println("end post config");
-    #endif
+    if(_debug){
+    debugMsg("end post config");
+    }
     
   });
   
@@ -296,9 +297,9 @@ void initialisePages(){
     if(!checkAuth()){return;}
 
     if(webServer.hasArg("update")){
-      #ifdef _GDebug
-      Serial.println("updating ioconfig");
-      #endif  
+      if(_debug){
+        debugMsg("updating ioconfig");
+      }
       
       String newIOConfig = "";
       newIOConfig += webServer.arg("cbo_io0_type");
@@ -309,10 +310,10 @@ void initialisePages(){
       newIOConfig += webServer.arg("cbo_io5_type");
       newIOConfig += webServer.arg("cbo_io6_type");
 
-      #ifdef _GDebug
-      Serial.print("New IO String:");
-      Serial.println(newIOConfig);
-      #endif
+      if(_debug){
+        debugMsgPrefx();Serial.print("New IO String:");
+        Serial.println(newIOConfig);
+      }
       
       updateIOConfig(newIOConfig);
       StoreIOConfig();
@@ -321,9 +322,9 @@ void initialisePages(){
     
     handleFileRead("/ioconfig.htm");
   
-    #ifdef _GDebug
-    Serial.println("end post config");
-    #endif
+    if(_debug){
+      debugMsg("end post config");
+    }
     
   });
   webServer.on("/ioControl/status",HTTP_GET,[]{
