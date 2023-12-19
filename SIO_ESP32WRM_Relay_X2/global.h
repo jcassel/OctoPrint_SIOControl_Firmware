@@ -15,6 +15,7 @@
 //Additionally IO 34,35,36,and39 can only be used as inputs.
 //reference: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
 
+
 #define IO0 34//  input only (Must configure (in code)without pullup or down. These inputs do not have these on chip)
 #define IO1 35//  input only  (Must configure (in code)without pullup or down. These inputs do not have these on chip)
 #define IO2 36//  input only (Labeled as SVP)  (Must configure (in code)without pullup or down. These inputs do not have these on chip)
@@ -30,6 +31,7 @@
 #define IO12 17//  Relay2
 #define IO13 23//  output has the board built in LED attached. Active LOW.
 
+#define OUTPUT_PWM -2 //Output Type For PWM
 
 #define IOSize  14 //number should be one more than the IO# :) (must include the idea of Zero) 
 bool _debug = false;
@@ -71,12 +73,22 @@ void updateIOConfig(String newIOConfig){
 }
 
 
+
 String getIOTypeString(int ioType){
-  if (ioType == 1){return "INPUT";}
-  if (ioType == 2){return "OUTPUT";}
-  if (ioType == 5){return "INPUT_PULLUP";}
-  if (ioType == 9){return "INPUT_PULLDOWN";}
-  if (ioType == 18){return "OUTPUT_OPEN_DRAIN";}
+  if (ioType == INPUT){return "INPUT";}
+  if (ioType == OUTPUT){return "OUTPUT";}
+  if (ioType == INPUT_PULLUP){return "INPUT_PULLUP";}
+  if (ioType == INPUT_PULLDOWN){return "INPUT_PULLDOWN";}
+  if (ioType == OUTPUT_OPEN_DRAIN){return "OUTPUT_OPEN_DRAIN";}
+  
+  if (ioType == OUTPUT_PWM){
+    #ifdef ENABLE_PWM_SUPPORT
+    return "OUTPUT_PWM";
+    #else
+    return "UnSupported OUTPUT_PWM";
+    #endif
+    }
+  
 }
 
 
