@@ -4,9 +4,11 @@
 //#define ENABLE_WIFI_SUPPORT
 //#define USE_DIGESTAUTH //use this for a little extra security. Maybe change the digest and default password too.
 
-#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.0.9"
+#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.1.0"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #define DEFAULT_HOSTS_NAME "SIOControler-New"
+#define FLASHSIZE "4MB with spiffs(1.2MB APP/1.5 SPIFFS)"
+
 
 #include "TimeRelease.h"
 #include <ArduinoJson.h>  
@@ -250,6 +252,9 @@ void checkSerial(){
       Serial.println(VERSIONINFO);
       Serial.print("CP:");
       Serial.println(COMPATIBILITY);
+      Serial.print("FS:");
+      Serial.println(FLASHSIZE);
+      
     }
     else if (command == "IC") { //io count.
       ack();
@@ -473,15 +478,14 @@ bool validateNewIOConfig(String ioConfig){
 }
 
 
-
 int getIOType(String typeName){
-  if(typeName == "INPUT"){return 1;}
-  if(typeName == "OUTPUT"){return 2;}
-  if(typeName == "INPUT_PULLUP"){return 5;}
-  if(typeName == "INPUT_PULLDOWN"){return 9;}
-  if(typeName == "OUTPUT_OPEN_DRAIN"){return 18;} //not sure on this value have to double check
+  if(typeName == "INPUT"){return INPUT;}
+  if(typeName == "OUTPUT"){return OUTPUT;}
+  if(typeName == "INPUT_PULLUP"){return INPUT_PULLUP;}
+  if(typeName == "INPUT_PULLDOWN"){return INPUT_PULLDOWN;}
+  if(typeName == "OUTPUT_OPEN_DRAIN"){return OUTPUT_OPEN_DRAIN;} //not sure on this value have to double check
+  if(typeName == "OUTPUT_PWM"){return OUTPUT_PWM;} //not sure on this value have to double check
 }
-
 
 bool loadIOConfig(){
   
@@ -491,6 +495,8 @@ if (!SPIFFS.exists("/IOConfig.json"))
     debugMsg("Using Default Config");
     return false;
   }
+  
+  
   File configfile = SPIFFS.open("/IOConfig.json","r");
 
   DynamicJsonDocument doc(2048);
