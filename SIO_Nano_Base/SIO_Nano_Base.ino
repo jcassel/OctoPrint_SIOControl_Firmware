@@ -15,7 +15,7 @@
 #define includeDebug
 
 
-#define VERSIONINFO "NanoSerialIO 1.0.6"
+#define VERSIONINFO "NanoSerialIO 1.0.7"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #include "TimeRelease.h"
 #include <Bounce2.h>
@@ -124,6 +124,7 @@ void ConfigIO(){
 
 TimeRelease IOReport;
 TimeRelease IOTimer[9];
+TimeRelease ReadyForCommands;
 unsigned long reportInterval = 3000;
 
 
@@ -157,7 +158,8 @@ void setup() {
   }
   
   IOReport.set(100ul);
-  Serial.println(F("RR")); //send ready for commands    
+  ReadyForCommands.set(reportInterval); //Initial short delay resets will be at 3x
+  //Serial.println(F("RR")); //send ready for commands    
 }
 
 
@@ -171,6 +173,10 @@ void loop() {
   if(!_pauseReporting){
     ioChanged = checkIO();
     reportIO(ioChanged);
+    if(ReadyForCommands.check()){
+      Serial.println("RR"); //send ready for commands   
+      ReadyForCommands.set(reportInterval *3);
+    }
     
   }
   
