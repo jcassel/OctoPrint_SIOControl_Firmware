@@ -1,4 +1,4 @@
-#include <ArduinoJson.h>  
+#include <ArduinoJson.h> 
 
 String LastStatus = "Ready!"; //latest status message.
 String Networks = "";
@@ -77,7 +77,7 @@ bool checkAuth(){
   }
   
 }
-bool handleFileRead(String path) {
+bool handleFileRead(String path,bool forDownLoad=false) {
   if(!checkAuth())
     return false;
     
@@ -92,7 +92,9 @@ bool handleFileRead(String path) {
       Serial.println(path);
     }
     File file = SPIFFS.open(path, "r");
-    if(path.endsWith("css")){
+    if(forDownLoad){
+      webServer.streamFile(file, "text/plain");
+    }else if(path.endsWith("css")){
       webServer.streamFile(file, "text/css");
     }else{
       webServer.streamFile(file, "text/html");
@@ -108,6 +110,70 @@ bool handleFileRead(String path) {
   }
   return false;
 }
+
+File fsUploadFile;  //SPIFFS file object to hold the new file info.
+void handleFileUpload(){ // upload a new file to the SPIFFS
+  HTTPUpload& upload = webServer.upload();
+    
+  if(upload.status == UPLOAD_FILE_START){
+    String filename = upload.filename;
+    LastStatus = filename; //put this here for use later when done the upload.
+    if(!filename.startsWith("/")) filename = "/"+filename;
+    debugMsgPrefx();Serial.print("handleFileUpload Name: "); Serial.println(filename);
+    fsUploadFile = SPIFFS.open(filename, "w");            // Open the file for writing in SPIFFS (create if it doesn't exist)
+    filename = String();
+  } else if(upload.status == UPLOAD_FILE_WRITE){
+    if(fsUploadFile)
+      fsUploadFile.write(upload.buf, upload.currentSize); // Write the received bytes to the file
+  } else if(upload.status == UPLOAD_FILE_END){
+    if(fsUploadFile) {                                    // If the file was successfully created
+      fsUploadFile.close();                               // Close the file again
+      debugMsgPrefx();Serial.print("handleFileUpload Size: "); Serial.println(upload.totalSize);
+      LastStatus = "File Upload success:" + LastStatus + ":" + String(upload.totalSize) + " bytes"; 
+      webServer.sendHeader("Location","/spiffs");      // Redirect the client to the success page
+      webServer.send(303);
+    } else {
+      webServer.send(500, "text/plain", "500: couldn't create file");
+    }
+  }
+}
+
+/*
+void GetFileList(String &PageContent){
+  return;
+}
+*/
+void GetFileList(String &PageContent){
+  File dir = SPIFFS.open ("/");
+  File file = dir.openNextFile();
+  PageContent += "<p>";
+  while (file) {
+      PageContent += "<a href='/spiffsDL?download=";
+      PageContent += file.name();
+      PageContent += "'>";
+      PageContent += file.name();
+      PageContent += " ";
+      PageContent += file.size();
+      PageContent += "</a>";
+      PageContent += "<br/>";
+      file = dir.openNextFile();
+  }
+  
+  PageContent += "<p>";
+  return;
+}
+
+
+void getSpiffsPage(String &page){
+    page = "<!DOCTYPE HTML><html><head><title>SPIFFS UPload</title><body>";
+    page += "<form method='post' enctype='multipart/form-data'><input type='file' name='name'><input class='button' type='submit' value='Upload'></form>";
+    GetFileList(page);
+    page += "<p>Last Status: " + LastStatus + "</p>";
+    page += "<p><a href='/config'>Return to Config</a></p>";
+    page += "</body></html>";
+}
+
+
 
 void initialisePages(){
   if(_debug){
@@ -382,6 +448,29 @@ void initialisePages(){
           
       }
   });
+
+  webServer.on("/spiffsDL",HTTP_GET,[]{
+    if(!checkAuth()){return;} //might be redundant since this is also done in the handleFileRead method
+    if(webServer.hasArg("download")){
+       String fileName = webServer.arg("download").c_str();
+       handleFileRead(fileName,true);
+    }
+  });
+  
+  webServer.on("/spiffs",HTTP_GET,[]{
+    if(!checkAuth()){return;} 
+    String page = "";
+    getSpiffsPage(page);
+    webServer.send(200, "text/html",page );
+  });
+
+  webServer.on("/spiffs", HTTP_POST,[](){ 
+    Serial.println("spiffs Called [post]");
+    if(!checkAuth()){return;}
+    webServer.send(200);}, // Send status 200 (OK) to tell the client we are ready to receive
+    handleFileUpload      // Receive and save the file
+  );
+
   
   
 }

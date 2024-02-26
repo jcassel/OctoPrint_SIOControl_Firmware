@@ -1,6 +1,10 @@
 #include "FS.h"
 #include <ArduinoJson.h> 
 
+
+
+
+
 //note that there are some IO points that are not optimal to use as basic IO points. There state at start up of the 
 //device migh cause issue where the device could go into programing mode or the IO pin might be pulsed on startup. 
 //These pins on the Esp32wroom module are 0,1,3,5, and 12. 
@@ -32,10 +36,20 @@
 #define IO13 23//  output has the board built in LED attached. Active LOW.
 
 #define OUTPUT_PWM -2 //Output Type For PWM
+#define INPUT_DHT -3 //Input Type for DHT Module Reading. 
+
+
+#include "DHTesp.h" //https://github.com/beegee-tokyo/DHTesp/tree/master
+#define DHTSensor DHTesp::DHT22
+#define dhtSize 4
+int dhtSizeDynamic = dhtSize; //This will be dynamic up to 4. actual count of usage is what will determin if a measurement will be made.
+DHTesp dht_sensor[dhtSize]; //allow up to 4 of these sensors to be used
+TempAndHumidity DTHValues[dhtSize];
+
 
 #define IOSize  14 //number should be one more than the IO# :) (must include the idea of Zero) 
 bool _debug = false;
-int IOType[IOSize]{INPUT,INPUT,INPUT,INPUT,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,OUTPUT,OUTPUT,OUTPUT};
+int IOType[IOSize]{INPUT,INPUT,INPUT,INPUT,INPUT_DHT,INPUT_DHT,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,OUTPUT,OUTPUT,OUTPUT};
 int IOMap[IOSize] {IO0,IO1,IO2,IO3,IO4,IO5,IO6,IO7,IO8,IO9,IO10,IO11,IO12,IO13};
 String IOSMap[IOSize] {"IO0","IO1","IO2","IO3","IO4","IO5","IO6","IO7","IO8","IO9","IO10","IO11","IO12","IO13"};
 int IO[IOSize];
@@ -54,20 +68,26 @@ void debugMsg(String msg){
 }
 
 bool isOutPut(int IOP){
-  return (IOType[IOP] == OUTPUT);
+  return (IOType[IOP] == OUTPUT || IOType[IOP] == OUTPUT_OPEN_DRAIN || IOType[IOP] == OUTPUT_PWM);
+}
+
+bool isINPUT(int IOP){
+  return (IOType[IOP] == INPUT)||(IOType[IOP] == INPUT_PULLUP)||(IOType[IOP] == INPUT_PULLDOWN);
 }
 
 
 
+//newIOConfig format is "##,##,##,##,##..." where each ## should be a 2 char string 
+//representing an integer with a leading zero where needed. A negative number like -3 does not need a leading zero.  
+//Where as a number like 1 or  5 should belike this 01 05
 void updateIOConfig(String newIOConfig){
-  Serial.println("************************review this for ESP32*********************");
-  for (int i=2;i<IOSize;i++){//start at 2 to avoid D0 and D1 
-    int nIOC = newIOConfig.substring(i,i+1).toInt();
-    if(IOType[i] != nIOC){
-      IOType[i] = nIOC;
-      if(nIOC == OUTPUT ||nIOC == OUTPUT_OPEN_DRAIN){
-        digitalWrite(IOMap[i],LOW); //set outputs to low since they will be high coming from INPUT_PULLUP
-      }
+
+ for(int i=0;i<IOSize;i++){
+    int istart = i*3;
+    String token = newIOConfig.substring(istart,istart+2);
+    IOType[i] = token.toInt();
+    if(isOutPut(i)){
+      digitalWrite(IOMap[i],LOW); //set outputs to low since they will be high coming from INPUT_PULLUP
     }
   }
 }
@@ -88,6 +108,11 @@ String getIOTypeString(int ioType){
     return "UnSupported OUTPUT_PWM";
     #endif
     }
+    
+  if (ioType == INPUT_DHT){
+    return "INPUT_DHT";
+  }
+    
   
 }
 

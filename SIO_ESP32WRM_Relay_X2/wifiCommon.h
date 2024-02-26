@@ -375,7 +375,7 @@ void DebugSettingsConfig(){
 String settingsConfigFile = "/config/settingsConfig.json";
 bool loadSettings(){
   if(_debug){
-    debugMsgPrefx();Serial.print("SettingsConfig file path: ");Serial.println(settingsConfigFile);
+    debugMsgPrefx();Serial.print("SettingsConfig(Web) file path: ");Serial.println(settingsConfigFile);
   }
   
   if (!SPIFFS.exists(settingsConfigFile))
