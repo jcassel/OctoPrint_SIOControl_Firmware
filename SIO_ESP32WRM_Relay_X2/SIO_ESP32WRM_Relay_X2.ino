@@ -5,7 +5,7 @@
 //#define ENABLE_PWM_SUPPORT
 //#define USE_DIGESTAUTH //use this for a little extra security. Maybe change the digest and default password too.
 
-#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.1.1"
+#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.1.2"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #define DEFAULT_HOSTS_NAME "SIOControler-New"
 #define FLASHSIZE "4MB with spiffs(1.2MB APP/1.5 SPIFFS)"
@@ -167,14 +167,14 @@ bool checkIO(){
   bool changed = false;
   
   for (int i=0;i<IOSize;i++){
-    if(!isINPUT(i)){
+    if(isINPUT(i)){
       Bnc[i].update();
       if(Bnc[i].changed()){
        changed = true;
        IO[i]=Bnc[i].read();
        if(_debug){debugMsg("Input Changed: "+String(i));}
       }
-    }else if(isOutPut){
+    }else if(isOutPut(i)){
       //is the current state of this output not the same as it was on last report.
       //this really should not happen if the only way an output can be changed is through Serial commands.
       //the serial commands force a report after it takes action.
@@ -182,7 +182,7 @@ bool checkIO(){
         if(_debug){debugMsg("Output Changed: "+String(i));}
         changed = true;
       }
-    }else if(IOType[i] == INPUT_DHT){
+    }else if(IOType[i] == INPUT_DHT || IOType[i] == OUTPUT_PWM ){
       //not checking digital change on this type of IO
     }
   }

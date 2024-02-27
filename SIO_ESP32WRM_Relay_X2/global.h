@@ -41,10 +41,19 @@
 
 #include "DHTesp.h" //https://github.com/beegee-tokyo/DHTesp/tree/master
 #define DHTSensor DHTesp::DHT22
-#define dhtSize 4
-int dhtSizeDynamic = dhtSize; //This will be dynamic up to 4. actual count of usage is what will determin if a measurement will be made.
-DHTesp dht_sensor[dhtSize]; //allow up to 4 of these sensors to be used
-TempAndHumidity DTHValues[dhtSize];
+#define DHTSize 4
+int dhtSizeDynamic = DHTSize; //This will be dynamic up to 4. Actual count of usage is what will determin if a measurement will be made.
+DHTesp dht_sensor[DHTSize]; //allow up to 4 of these sensors to be used
+TempAndHumidity DTHValues[DHTSize];
+
+#include "ESP32_FastPWM.h"
+#define PWMSize 4
+int pemSizeDynamic = PWMSize; //This will be dynamic up to 4. Actual count of usage is what will determin if a measurement will be made.
+ESP32_FAST_PWM* PWM_Instance[PWMSize];
+uint8_t PWMChannel[PWMSize]{0,1,2,3};
+float frequency[PWMSize] = {1000.0f,1000.0f,1000.0f,1000.0f};
+float dutyCycle[PWMSize] = {0.0f,0.0f,0.0f,0.0f};
+int PWMResolution[PWMSize] = {12,12,12,12};
 
 
 #define IOSize  14 //number should be one more than the IO# :) (must include the idea of Zero) 
@@ -112,7 +121,7 @@ String getIOTypeString(int ioType){
   if (ioType == INPUT_DHT){
     return "INPUT_DHT";
   }
-    
+  return "UnSupported unknown Type: " + String(ioType);
   
 }
 

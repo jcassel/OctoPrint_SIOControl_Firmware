@@ -311,7 +311,7 @@ void SetupWifi(){
     }
     debugMsgPrefx();Serial.print("WifiMode:");
     Serial.println(wifiConfig.wifimode);
-    if(wifiConfig.wifimode == "WIFI_AP"){
+    if(String(wifiConfig.wifimode) == "WIFI_AP"){
       InAPMode  = true;
     }else{
       InAPMode  = false;
