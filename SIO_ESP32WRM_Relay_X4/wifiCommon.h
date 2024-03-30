@@ -311,7 +311,7 @@ void SetupWifi(){
     }
     debugMsgPrefx();Serial.print("WifiMode:");
     Serial.println(wifiConfig.wifimode);
-    if(wifiConfig.wifimode == "WIFI_AP"){
+    if(String(wifiConfig.wifimode) == "WIFI_AP"){
       InAPMode  = true;
     }else{
       InAPMode  = false;
@@ -375,7 +375,7 @@ void DebugSettingsConfig(){
 String settingsConfigFile = "/config/settingsConfig.json";
 bool loadSettings(){
   if(_debug){
-    debugMsgPrefx();Serial.print("SettingsConfig file path: ");Serial.println(settingsConfigFile);
+    debugMsgPrefx();Serial.print("SettingsConfig(Web) file path: ");Serial.println(settingsConfigFile);
   }
   
   if (!SPIFFS.exists(settingsConfigFile))

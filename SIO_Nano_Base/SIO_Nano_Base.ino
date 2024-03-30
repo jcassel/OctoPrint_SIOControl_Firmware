@@ -10,12 +10,12 @@
 //cmnd is short for command
 //Reciently v1.0.0.6 I have made heavey use of the F String Macro to move strings to the Program space. This has helped alot. 
 //There is plenty of program space so using the F macro seems to be the answer to the run time memory issue when using string. 
-//At the time of this writing enabled is 46%(1104 bytes free) and disabled is 43%(1167 bytes free) free memrory for runtime
+//At the time of this writing enabled is 46%(1093 bytes free) and disabled is 44%(1144 bytes free) free memrory for runtime
 //I may in the near future just remove the includeDegbug define and the associated checks. 
 #define includeDebug
 
 
-#define VERSIONINFO "NanoSerialIO 1.0.7"
+#define VERSIONINFO "NanoSerialIO 1.0.8"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #include "TimeRelease.h"
 #include <Bounce2.h>
@@ -42,6 +42,11 @@
 #define IO17 A5 // pin24/A5
 //Note that A6 and A7 can only be used as Analog inputs. 
 //Arduino Documentation also warns that Any input that it floating is suseptable to random readings. Best way to solve this is to use a pull up(avalible as an internal) or down resister(external).I set all internals to pull up see IOTypes
+
+//these are not supported yet and may never be in the nano. They are eneded here to facilitate some reuse of code. 
+//also note that the Mega328 only supports INPUT,OUTPUT,INPUT_PULLUP as part of the Arduino.h lib.
+//#define OUTPUT_PWM -2 //Output Type For PWM
+//#define INPUT_DHT -3 //Input Type for DHT Module Reading. 
 
 
 #define IOSize  18 //(0-19)note that this equates to 18 bacause of D0andD1 as Serial.
@@ -101,12 +106,19 @@ void FetchIOConfig(){
 
 
 bool isOutPut(int IOP){
-  return IOType[IOP] == OUTPUT; 
+  //return (IOType[IOP] == OUTPUT || IOType[IOP] == OUTPUT_PWM);
+  return (IOType[IOP] == OUTPUT);
 }
+
+bool isINPUT(int IOP){
+  return (IOType[IOP] == INPUT)||(IOType[IOP] == INPUT_PULLUP);
+}
+
+
 
 void ConfigIO(){
   #ifdef includeDebug
-    debugMsg("< Set IO");
+    debugMsg(F("< Set IO"));
   #endif
   for (int i=0;i<IOSize;i++){
     if(IOType[i] == 0 ||IOType[i] == 2 || IOType[i] == 3){ //if it is an input
@@ -200,28 +212,24 @@ bool checkIO(){
   bool changed = false;
   
   for (int i=0;i<IOSize;i++){
-    if(!isOutPut(i)){
+    if(isINPUT(i)){
       Bnc[i].update();
       if(Bnc[i].changed()){
        changed = true;
        IO[i]=Bnc[i].read();
-       #ifdef includeDebug 
-       if(_debug){debugMsg("IO Chg: "+String(i));}
-       #endif
+       if(_debug){debugMsgPrefx();Serial.print(F("Input Changed: "));Serial.println(i);}
       }
-    }else{
-      
+    }else if(isOutPut(i)){
       //is the current state of this output not the same as it was on last report.
       //this really should not happen if the only way an output can be changed is through Serial commands.
       //the serial commands force a report after it takes action.
       if(IO[i] != digitalRead(IOMap[i])){
-        #ifdef includeDebug 
-        if(_debug){debugMsgPrefx();Serial.print(F("IO Chg: "));Serial.print(String(i));}
-        #endif
+        if(_debug){debugMsgPrefx();Serial.print(F("Output Changed: "));Serial.println(i);}
         changed = true;
       }
+    //}else if(IOType[i] == INPUT_DHT || IOType[i] == OUTPUT_PWM ){
+      //not checking digital change on this type of IO
     }
-    
   }
     
   return changed;
@@ -237,6 +245,19 @@ void reportIOTypes(){
   #ifdef includeDebug 
     if(_debug){debugMsgPrefx();Serial.print(F("IOSize:")); Serial.println(String(IOSize));}
   #endif
+}
+
+void DisplayIOTypeConstants(){
+  Serial.print(F("TC "));
+  Serial.print(F("INPUT:"));Serial.print(INPUT);Serial.print(",");//0
+  Serial.print(F("OUTPUT:"));Serial.print(OUTPUT);Serial.print(",");//1
+
+  Serial.print(F("INPUT_PULLUP:"));Serial.println(INPUT_PULLUP);//2  NOTE*********fix the new line if you add additional response types.
+  //Serial.print(F("INPUT_PULLUP:"));Serial.print(INPUT_PULLUP);Serial.print(",");//5
+  //Serial.print("INPUT_PULLDOWN:");Serial.print(INPUT_PULLDOWN);Serial.print(",");//9
+  //Serial.print("OUTPUT_OPEN_DRAIN:");Serial.print(OUTPUT_OPEN_DRAIN);Serial.print(",");//18
+  //Serial.print("INPUT_DHT:");Serial.print(INPUT_DHT);Serial.print(",");//-3
+  //Serial.print("OUTPUT_PWM:");Serial.println(OUTPUT_PWM);//-2 
 }
 
 void checkSerial(){
@@ -255,15 +276,15 @@ void checkSerial(){
       
       #ifdef includeDebug
       if(_debug){
-        debugMsg("cmnd:[" + command + "]");
-        debugMsg("val:[" + value+ "]");
+        debugMsgPrefx();Serial.print(F("cmnd:["));Serial.print(command);Serial.println(F("]"));
+        debugMsgPrefx();Serial.print(F("val:["));Serial.print(value);Serial.println(F("]"));
       }
       #endif 
     }else{
       command = buf;
       #ifdef includeDebug
       if(_debug){
-        debugMsg("cmnd:[" + command + "]");
+        debugMsgPrefx();Serial.print(F("cmnd:["));Serial.print(command);Serial.println(F("]"));
       }
       #endif
     }
@@ -293,6 +314,22 @@ void checkSerial(){
       Serial.println(VERSIONINFO);
       Serial.print(F("CP:"));
       Serial.println(COMPATIBILITY);
+      Serial.print("XT BRD:");
+      #ifdef __AVR_ATmega1280__
+        Serial.print("ATmega1280");
+      #elif __AVR_ATmega2560__
+        Serial.println("ATmega2560");
+      #elif __AVR_ATmega328P__
+        Serial.println("ATmega328P");
+      #elif __AVR_ATmega168__
+        Serial.println("ATmega168");
+      #elif __AVR_ATmega32U4__
+        Serial.println("ATmega32U4");
+      #elif __AVR_ATmega16U4__
+        Serial.println("ATmega16U4");
+      #else
+        Serial.println(F("Unknown board"));
+      #endif
     }
     else if (command == "IC") { //io count.
       ack();
@@ -340,6 +377,11 @@ void checkSerial(){
       reportIOTypes();
       return;
     }
+    else if(command == "TC"){
+      ack();
+      DisplayIOTypeConstants();
+      return;
+    }
     
     //Set IO point high or low (only applies to IO set to output)
     else if(command =="IO"){ 
@@ -354,9 +396,9 @@ void checkSerial(){
         String sIOSet = value.substring(value.indexOf(" ")+1); // leaving this as a string allows for easy check on correct posible values
         #ifdef includeDebug
         if(_debug){
-          debugMsg("IO#:"+ sIOPoint);
-          debugMsg("GPIO#:"+ String(IOMap[sIOPoint.toInt()]));
-          debugMsg("Set to:"+ sIOSet);
+          debugMsgPrefx();Serial.print(F("IO#:"));Serial.println(sIOPoint);
+          debugMsgPrefx();Serial.print(F("GPIO#:"));Serial.println(IOMap[sIOPoint.toInt()]);
+          debugMsgPrefx();Serial.print(F("Set to:"));Serial.println(sIOSet);
         }
         #endif
 
@@ -438,50 +480,101 @@ void ack(){
 }
 
 bool validateNewIOConfig(String ioConfig){
+  int newConfig[IOSize];
+  int incomingSize = 0;
   
-  if(ioConfig.length() != IOSize){
-    #ifdef includeDebug
-      if(_debug){debugMsg(F("IOConfig validation failed(Wrong len)"));}
-    #endif
+  if(ioConfig.length() == (IOSize*3+1)){
+    debugMsgPrefx();
+    Serial.print(F("IOConfig validation failed(Wrong len): required minimal len["));
+    Serial.print((IOSize*3+1));
+    Serial.print(F("] supplied len["));
+    Serial.print(ioConfig.length());
+    Serial.println("]" );
     return false;  
   }
 
-  for (int i=0;i<IOSize;i++){
-    int pointType = ioConfig.substring(i,i+1).toInt();
-    if(pointType > 4){//cant be negative. we would have a bad parse on the number so no need to check negs
-      #ifdef includeDebug
-      if(_debug){
-        debugMsgPrefx();Serial.println(F("IO validation failed"));
-        debugMsgPrefx();Serial.print(F("Bad IO Type: index["));Serial.print(i);Serial.print(F("] type["));Serial.print(pointType);Serial.println(F("]"));
-      }
-      #endif
+  for(int i=0;i<IOSize;i++){
+    int istart = i*3;
+    String token = ioConfig.substring(istart,istart+2);
+    if(_debug){debugMsgPrefx();Serial.print(F("Token: "));Serial.println(token.toInt());}
+    newConfig[i] = token.toInt();
+    if(!isValidIOType(newConfig[i])){
+      debugMsgPrefx();Serial.print(F("IO Type is invalid: ["));Serial.print(token.toInt());Serial.print(F("] @ position:["));Serial.print(i);Serial.println(F("]"));
       return false;
     }
+    incomingSize = i;
   }
-  #ifdef includeDebug
-  if(_debug){debugMsg(F("IOConfig validation good"));}
-  #endif
-  return true; //seems its a good set of point Types.
+
+  if(incomingSize+1 != IOSize){
+    debugMsg(F("IOConfig validation failed. IO pattern did not have the correct number of point configs."));
+    debugMsg("IO Count: " + String(IOSize));
+    debugMsg("Parttern Count: " + String(incomingSize));
+    return false;
+  }
+
+  if(_debug){
+    debugMsg(F("New Config passed Validation"));
+    debugMsgPrefx();
+    for(int i=0;i< IOSize;i++){
+      Serial.print("[");Serial.print(newConfig[i]);Serial.print("],");
+    }
+    Serial.println("");
+  }
+
+ return true; //seems its a good set of point Types.
+ 
 }
 
+//newIOConfig format is "##,##,##,##,##..." where each ## should be a 2 char string 
+//representing an integer with a leading zero where needed. A negative number like -3 does not need a leading zero.  
+//Where as a number like 1 or  5 should belike this 01 05
 void updateIOConfig(String newIOConfig){
-  for (int i=2;i<IOSize;i++){//start at 2 to avoid D0 and D1
-    int nIOC = newIOConfig.substring(i,i+1).toInt();
-    if(IOType[i] != nIOC){
-      IOType[i] = nIOC;
-      if(nIOC == OUTPUT){
-        digitalWrite(IOMap[i],LOW); //set outputs to low since they will be high coming from INPUT_PULLUP
-      }
+
+ for(int i=0;i<IOSize;i++){
+    int istart = i*3;
+    String token = newIOConfig.substring(istart,istart+2);
+    IOType[i] = token.toInt();
+    if(isOutPut(i)){
+      digitalWrite(IOMap[i],LOW); //set outputs to low since they will be high coming from INPUT_PULLUP
     }
   }
 }
 
+String getIOTypeString(int ioType){
+  if (ioType == INPUT){return F("INPUT");}
+  if (ioType == OUTPUT){return F("OUTPUT");}
+  if (ioType == INPUT_PULLUP){return F("INPUT_PULLUP");}
+  //if (ioType == INPUT_PULLDOWN){return F("INPUT_PULLDOWN");}
+  //if (ioType == OUTPUT_OPEN_DRAIN){return F("OUTPUT_OPEN_DRAIN");}
+  //if (ioType == OUTPUT_PWM){return F("OUTPUT_PWM");}
+  //if (ioType == INPUT_DHT){return F("INPUT_DHT");}
+  
+  return "UnSupported Type: " + String(ioType);
+  
+}
+
+
+bool isValidIOType(int ioType){
+  if(ioType == INPUT){return true;}
+  if(ioType == OUTPUT){return true;}
+  if(ioType == INPUT_PULLUP){return true;}
+  //if(ioType == INPUT_PULLDOWN){return true;}
+  //if(ioType == OUTPUT_OPEN_DRAIN){return true;}
+  //if(ioType == OUTPUT_PWM){return true;}
+  //if(ioType == INPUT_DHT){return true;}
+  return false;
+}
+
+
 int getIOType(String typeName){
-  if(typeName == "INPUT"){return 0;}
-  if(typeName == "OUTPUT"){return 1;}
-  if(typeName == "INPUT_PULLUP"){return 2;}
-  if(typeName == "INPUT_PULLDOWN"){return 3;}
-  if(typeName == "OUTPUT_OPEN_DRAIN"){return 4;} //not sure on this value have to double check
+  if(typeName == "INPUT"){return INPUT;}
+  if(typeName == "OUTPUT"){return OUTPUT;}
+  if(typeName == "INPUT_PULLUP"){return INPUT_PULLUP;}
+  //if(typeName == "INPUT_PULLDOWN"){return INPUT_PULLDOWN;}
+  //if(typeName == "OUTPUT_OPEN_DRAIN"){return OUTPUT_OPEN_DRAIN;} //not sure on this value have to double check
+  //if(typeName == "OUTPUT_PWM"){return OUTPUT_PWM;} //not sure on this value have to double check
+  //if(typeName == "INPUT_DHT"){return INPUT_DHT;} //not sure on this value have to double check
+  return -1;
 }
 
 

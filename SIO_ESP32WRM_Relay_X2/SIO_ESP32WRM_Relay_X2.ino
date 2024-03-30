@@ -2,10 +2,10 @@
 //Takes serial commands to control configured IO.
 //Reports IO status created for use with OctoPrint_SIOControl_plugin
 //#define ENABLE_WIFI_SUPPORT
-//#define ENABLE_PWM_SUPPORT
 //#define USE_DIGESTAUTH //use this for a little extra security. Maybe change the digest and default password too.
+//#define _PWM_LOGLEVEL_ 4 //4 is verbose
 
-#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.1.2"
+#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.1.3"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #define DEFAULT_HOSTS_NAME "SIOControler-New"
 #define FLASHSIZE "4MB with spiffs(1.2MB APP/1.5 SPIFFS)"
@@ -33,7 +33,7 @@
 
 void ConfigIO(){
   int i_dht = 0;
-  
+  int i_pwm = 0;
   debugMsg("Setting IO");
   for (int i=0;i<IOSize;i++){
     if(IOType[i] == INPUT ||IOType[i] == INPUT_PULLUP || IOType[i] == INPUT_PULLDOWN){ //if it is an input
@@ -41,12 +41,22 @@ void ConfigIO(){
       Bnc[i].attach(IOMap[i],IOType[i]);
       Bnc[i].interval(5);
     }else if(IOType[i] == INPUT_DHT){
-      if(i_dht<4){
+      if(i_dht<DHTSize){
         debugMsgPrefx();Serial.print("Config[DHT:");Serial.print(i_dht);Serial.print("] for IO Number: ");Serial.println(i);
         dht_sensor[i_dht].setup(IOMap[i], DHTSensor);
         i_dht = i_dht+1;
       }else{
         debugMsg("[Warning!] Exceeded number of DHT sensor configurations.");
+        pinMode(IOMap[i],INPUT); //configure as floating input default.
+      }
+    }else if(IOType[i] == OUTPUT_PWM){
+      if(i_pwm<PWMSize){
+        debugMsgPrefx();Serial.print("Config[PWM:");Serial.print(i_pwm);Serial.print("] for IO Number: ");Serial.println(i);
+        PWM_Instance[i_pwm] = new ESP32_FAST_PWM(IOMap[i], PWMFrequency[i_pwm], PWMDutyCycle[i_pwm], i_pwm, PWMResolution[i_pwm]);
+        pwmMap[i_pwm] = i;
+        i_pwm = i_pwm+1;
+      }else{
+        debugMsg("[Warning!] Exceeded number of PWM OUtput configurations.");
         pinMode(IOMap[i],INPUT); //configure as floating input default.
       }
     }else{
@@ -55,8 +65,56 @@ void ConfigIO(){
     }
   }
   
+  pwmSizeDynamic = i_pwm; //set used portion of the array.
+  debugMsgPrefx();Serial.print("pwmSizeDynamic is: ");Serial.println(pwmSizeDynamic);
   dhtSizeDynamic = i_dht; //set used portion of the array.
   
+}
+
+void printPWMInfo(ESP32_FAST_PWM* PWM_Instance)
+{
+  debugMsgPrefx(); Serial.print("Actual data: pin = ");
+  Serial.print(PWM_Instance->getPin());
+  Serial.print(", PWM DC = ");
+  Serial.print(PWM_Instance->getActualDutyCycle());
+  Serial.print(", PWMPeriod = ");
+  Serial.print(PWM_Instance->getPWMPeriod());
+  Serial.print(", PWM Freq (Hz) = ");
+  Serial.println(PWM_Instance->getActualFreq());
+}
+
+
+void setPWM(int idx){
+    int pin = PWM_Instance[idx]->getPin();
+    float frq = PWMFrequency[idx] + 0.00f;
+    float dc = PWMDutyCycle[idx]+ 0.00f;
+    if(_debug){debugMsgPrefx();Serial.print("setPWM for idx:");Serial.print(idx);Serial.print(" and Pin:");Serial.println(pin);}
+    PWM_Instance[idx]->setPWM(pin, frq, dc);
+    printPWMInfo(PWM_Instance[idx]);
+
+    if(_debug){
+      debugMsgPrefx(); Serial.print("Array data: pin = ");
+      Serial.print(pwmMap[idx]);
+      Serial.print(", PWM DC = ");
+      Serial.print(PWMDutyCycle[idx]);
+      Serial.print(", PWMResolution = ");
+      Serial.print(PWMResolution[idx]);
+      Serial.print(", PWM Freq (Hz) = ");
+      Serial.println(PWMFrequency[idx]);
+    }
+
+
+
+
+
+    return;
+}
+
+void setPWM(){
+  for(int i = 0;i<pwmSizeDynamic;i++){
+    setPWM(i);
+  }
+  return;
 }
 
 
@@ -78,6 +136,7 @@ void setup() {
   debugMsg("Initializing IO");
   ConfigIO();
   reportIOTypes();
+  setPWM(); //does all configured
   debugMsg("End Types");
 
   //need to get a baseline state for the inputs and outputs.
@@ -209,15 +268,9 @@ void DisplayIOTypeConstants(){
   Serial.print("INPUT_PULLUP:");Serial.print(INPUT_PULLUP);Serial.print(",");//5
   Serial.print("INPUT_PULLDOWN:");Serial.print(INPUT_PULLDOWN);Serial.print(",");//9
   Serial.print("OUTPUT_OPEN_DRAIN:");Serial.print(OUTPUT_OPEN_DRAIN);Serial.print(",");//18
-  Serial.print("INPUT_DHT:");Serial.println(INPUT_DHT);//-3
-  
-  #ifdef ENABLE_PWM_SUPPORT
-  Serial.print("OUTPUT_PWM:");Serial.print(OUTPUT_PWM);Serial.print(",");//-2
-  #endif
-  
-  
-  
-  
+  Serial.print("INPUT_DHT:");Serial.print(INPUT_DHT);Serial.print(",");//-3
+  Serial.print("OUTPUT_PWM:");Serial.println(OUTPUT_PWM);//-2
+    
 }
 
 
@@ -271,6 +324,8 @@ void checkSerial(){
       Serial.println(COMPATIBILITY);
       Serial.print("FS:");
       Serial.println(FLASHSIZE);
+      Serial.print("XT BRD:");
+      Serial.println(ARDUINO_BOARD);
       
     }
     else if (command == "IC") { //io count.
@@ -409,6 +464,32 @@ void checkSerial(){
         if(result){debugMsg("IOSettings Remove Success");}else{debugMsg("IOSettings Remove Failed");}    
       }
       
+    }else if(command == "PWM"){
+        int istart = 0;
+        int iend = value.indexOf(" ",istart);
+        int ION = value.substring(istart,iend).toInt();
+
+        istart = iend+1;
+        iend = value.indexOf(" ",istart);
+        float dc = value.substring(istart,iend).toFloat(); //dutyCycle
+
+        istart = iend+1;
+        iend = value.indexOf(" ",istart);
+        float freq = value.substring(istart,iend).toFloat(); //frequency
+        
+        debugMsgPrefx();Serial.print("ION: ");Serial.print(ION); Serial.print(" DC: "); Serial.print(dc);Serial.print(" Fq: "); Serial.println(freq);
+        for(int idx=0;idx<pwmSizeDynamic;idx++){
+          debugMsgPrefx();Serial.print("pwmMap[");Serial.print(idx);Serial.print("] is [");Serial.print(pwmMap[idx]);Serial.println("]");
+          if(pwmMap[idx] == ION){
+            PWMFrequency[idx] = freq;
+            PWMDutyCycle[idx] = dc;
+            setPWM(idx);
+            debugMsg("PWM for IO Updated");
+            break;
+          }
+        }
+        //debugMsg("No PWM Configuration on IO Point supplied");
+        
     }
     #ifdef ENABLE_WIFI_SUPPORT
     else if(command == "WF"){
@@ -664,8 +745,10 @@ bool IsSpaceLeft()
 #define FORMAT_SPIFFS_IF_FAILED true
 
 void InitStorageSetup(){
+   debugMsg("Warning SPIFFS Mounting. You may get a failed message next on first run. Let it run for 60 seconds and it should finish formatting and complete the mount."); 
    if(!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)){
       debugMsg("Warning SPIFFS Mount Failed (Attempt Restart if this is the first time this firmware was loaded.)");
       return;
    }
+   debugMsg("SPIFFs is Mounted");
 }
