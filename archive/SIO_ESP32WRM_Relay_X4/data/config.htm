@@ -1,0 +1,63 @@
+<!DOCTYPE HTML><html><head><title>SIO Control Web Configuration</title>
+<link rel="stylesheet" type="text/css" href="/style.css"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"></head>
+	<body>
+		<div id="loader" class="lds-dual-ring overlay hidden"></div>
+		<div id="action" class="normal hidden" ></div>
+		<div id="gcontainer" class="grid-container hidden">
+		  <div class="header"><span id="deviceInfo" >...</span></div>
+		  <div class="menu">	
+			<ul class="topnav">
+			  <li><a class="active" href="/config">Configuration</a></li>
+			  <li><a href="/ioconfig">IO Config</a></li>
+			  <!--<li><a href="/spiffs">File Upload</a></li>
+			  <li class="right"><a href="/update">Update Firmware</a></li>-->
+			</ul>
+		  </div>
+		  
+		  <div  id="main" class="main ">
+			<details id="wfdts">
+			<summary>WiFi Networks:<input onclick='GetNetworks();' type='button' name='Scan' value='Scan'/></summary>
+			<div class="normal" id="networks"></div>
+			</details> 
+			
+			<form id="frm" class="frm" method='POST' action='/config'>
+			<h3>WiFi Mode:<div><select name="cbo_WFMD" id="cbo_WFMD">
+			  <option value="WIFI_AP">Access Point</option>
+			  <option value="WIFI_STA">Station</option>
+			</select></h3> 
+			<h3><div>Host Name: </div><div><input type='text' name='tx_HNAM' id='tx_HNAM' value=''/></div></h3>
+			<h3>WiFi SSID:<div><input type='text' name='tx_SSID' list="SSIDs" id='tx_SSID' value=''/></div></h3> 
+			<datalist id="SSIDs" ></datalist>
+			<h3><div>WiFi Password: </div><div><input type='password' name='tx_WFPW' id='tx_WFPW' value=''/><input type="checkbox" onclick="toggleWiFiPassword()">Show Password</div></h3> 
+			<h3><div>Wifi Connection Attempts: </div><div><input type='text' name='tx_WFCA' id='tx_WFCA' value=''/></div></h3>
+			<h3><div>Wifi Attempts Delay: </div><div><input type='text' name='tx_WFAD' id='tx_WFAD' value=''/>Milliseconds(2000+)</div></h3>
+			<h3><div>Config Access Password: </div><div><input type='password' name='tx_APW' id='tx_APW' value=''/><input type="checkbox" onclick="toggleAccessPassword()">Show Password</div></h3>
+			<h3><div>Status Interval: </div><div><input type='text' name='tx_STI' id='tx_STI' value=''/>Seconds</div></h3>
+			<!--future
+			<h3><div><input type='checkbox' name='ch_MQTTEN' id='ch_MQTTEN' value='1'>Enable MQTT</div></h3>
+			<h3><div>MQTT Server: </div><div><input type='text' name='tx_MQTTSRV' id='tx_MQTTSRV' value=''/></div></h3>
+			<h3><div>MQTT Port: </div><div><input type='text' name='tx_MQTTPort' id='tx_MQTTPort' value=''/></div></h3>
+			<h3><div>MQTT UserName: </div><div><input type='text' name='tx_MQTTUSR' id='tx_MQTTUSR' value=''/></div></h3>
+			<h3><div>MQTT Password: </div><div><input type='text' name='tx_MQTTPW' id='tx_MQTTPW' value=''/></div></h3>
+			-->
+			<p><h3><div>OctoPrint URI: </div><div><input type='text' name='tx_OPURI' id='tx_OPURI' value=''/></div></h3>
+			<h3><div>OctoPrint Port: </div><div><input type='text' name='tx_OPPort' id='tx_OPPort' value=''/></div></h3>
+			<h3><div>OctoPrint APIKey: </div><div><input type='text' name='tx_OPAK' id='tx_OPAK' value=''/></div></h3></p>
+			</p>
+			<h3><div>Time Zone OffSet hrs: </div><div><input type='text' name='tx_TZOS' id='tx_TZOS' value=''/></div></h3>
+			<h4><div><input type='submit' name='update' value='Update'/> </div></h4>
+			<h4><div><input type='submit' name='reboot' value='Reboot'/> </div></h4>
+			<h4>Status:<span id="status"></span></h4>
+			</form>
+		  </div>  
+		  <div class="footer"><span id="firmwareV"></span></div>
+		</div>
+		<script>
+			var domReady = function(callback) {
+					document.readyState === "interactive" || document.readyState === "complete" ? callback() : document.addEventListener("DOMContentLoaded", callback);
+			};
+		</script>
+		<script type="application/javascript" src="config.js"></script>  
+  	</body>
+</html>
