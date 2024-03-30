@@ -1,42 +1,70 @@
-//Note that this sketch is too large due to some of the Serial String use for an Arduino Nano if you have a board with less
-//memory than an ATMega2560 use the nano base firmware. 
-  
 
-#define VERSIONINFO "SIO_Arduino_General 1.0.9"
+#define VERSIONINFO "SIO_Arduino_General 1.0.10"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #include "TimeRelease.h"
 #include <Bounce2.h>
 #include <EEPROM.h>
 
-
-#define IOSize  19 //number should be one more than the IO# :) (must include the idea of Zero)  
-//Outputs
-#define IO0 3  
-#define IO1 4
-#define IO2 5
-#define IO3 6
-#define IO4 7
-#define IO5 8
-#define IO6 9
-#define IO7 10
-#define IO8 11
-#define IO9 12
-#define IO10 13
-//Inputs
-#define IO11 A0
-#define IO12 A1
-#define IO13 A2 
-#define IO14 A3
-#define IO15 A4
-#define IO16 A5
-#define IO17 A6
-#define IO18 A7 
-
 bool _debug = false;
 
-int IOType[IOSize]{OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, INPUT, INPUT, INPUT, INPUT, INPUT, INPUT, INPUT, INPUT };
-int IOMap[IOSize] {IO0,IO1,IO2,IO3,IO4,IO5,IO6,IO7,IO8,IO9,IO10,IO11,IO12,IO13,IO14,IO15,IO16,IO17,IO18};
-String IOSMap[IOSize] {"IO0","IO1","IO2","IO3","IO4","IO5","IO6","IO7","IO8","IO9","IO10","IO11","IO12","IO13","IO14","IO15","IO16","IO17","IO18"};
+#ifdef __AVR_ATmega2560__
+  #define IOSize  19 //(generic arduino board with mega2560) 
+  #define IO0 3  
+  #define IO1 4
+  #define IO2 5
+  #define IO3 6
+  #define IO4 7
+  #define IO5 8
+  #define IO6 9
+  #define IO7 10
+  #define IO8 11
+  #define IO9 12
+  #define IO10 13
+  #define IO11 A0
+  #define IO12 A1
+  #define IO13 A2 
+  #define IO14 A3
+  #define IO15 A4
+  #define IO16 A5
+  #define IO17 A6
+  #define IO18 A7 
+
+  int IOType[IOSize]{OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, INPUT, INPUT, INPUT, INPUT, INPUT, INPUT, INPUT, INPUT };
+  int IOMap[IOSize] {IO0,IO1,IO2,IO3,IO4,IO5,IO6,IO7,IO8,IO9,IO10,IO11,IO12,IO13,IO14,IO15,IO16,IO17,IO18};
+  String IOSMap[IOSize] {"IO0","IO1","IO2","IO3","IO4","IO5","IO6","IO7","IO8","IO9","IO10","IO11","IO12","IO13","IO14","IO15","IO16","IO17","IO18"};  
+
+#elif __AVR_ATmega328P__
+  #define IOSize  18 
+  #define IO0 2   // pin5/D5
+  #define IO1 3   // pin6/D3
+  #define IO2 4   // pin7/D4
+  #define IO3 5   // pin8/D5
+  #define IO4 6   // pin9/D6
+  #define IO5 7  // pin10/D7
+  #define IO6 8  // pin11/D8
+  #define IO7 9  // pin12/D9
+  #define IO8 10  // pin13/D10
+  #define IO9 11  // pin14/D11
+  #define IO10 12  // pin15/D12
+  #define IO11 13 // pin16/D13(LED)* if you want to use this as an input, you will need to remove the led from the MCU board.
+
+  #define IO12 A0 // pin19/A0  
+  #define IO13 A1 // pin20/A1
+  #define IO14 A2 // pin21/A2
+  #define IO15 A3 // pin22/A3
+  #define IO16 A4 // pin23/A4
+  #define IO17 A5 // pin24/A5
+  int IOType[IOSize]{INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT}; //0-19
+  int IOMap[IOSize] {IO0,IO1,IO2,IO3,IO4,IO5,IO6,IO7,IO8,IO9,IO10,IO11,IO12,IO13,IO14,IO15,IO16,IO17};
+  String IOSMap[IOSize] {"IO0","IO1","IO2","IO3","IO4","IO5","IO6","IO7","IO8","IO9","IO10","IO11","IO12","IO13","IO14","IO15","IO16","IO17"};  
+ 
+#else //some well known defined boards are (__AVR_ATmega16U4__, __AVR_ATmega1280__, __AVR_ATmega168__, __AVR_ATmega32U4__) 
+  Error(F("Unknown/unconfigured board")); 
+  Will need to remove this if this is the board you have see how the other boards are setup and create a setup you need for your board.  
+  Please if you add support for a new board here, either create a pull request or put the details in an issue request and I will add it to the firmware. 
+#endif
+
+
 int IO[IOSize];
 Bounce Bnc[IOSize];
 bool EventTriggeringEnabled = 1;
