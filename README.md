@@ -9,4 +9,7 @@ If you have a board / MCU you perfer, you likley can just modify the Firmware an
 If you are looking for some support, I will be working on the wiki. Check it out. If you dont find what you are looking for there, I lurk a lot on the [OctoPrint community site](https://community.octoprint.org/). Post there in the plugins section and I will likely see it and respond. 
 
 
-### Note that as up version 1.1.2 (2-26-2024) The SIO_ESP32WRM_Relay_x(n) firmware requires the latest ESP32 boards lib to support PWM Output being developed. 
+## Prerequisites for ESP32 Versions.
+
+1. [`Arduino IDE 1.8.19+` for Arduino](https://github.com/arduino/Arduino). [![GitHub release](https://img.shields.io/github/release/arduino/Arduino.svg)](https://github.com/arduino/Arduino/releases/latest)
+2. [`ESP32 Core 2.0.6+`](https://github.com/espressif/arduino-esp32) for ESP32-based boards. [![Latest release](https://img.shields.io/github/release/espressif/arduino-esp32.svg)](https://github.com/espressif/arduino-esp32/releases/latest/).

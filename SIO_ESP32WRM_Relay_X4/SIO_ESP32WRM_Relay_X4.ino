@@ -4,7 +4,7 @@
 //#define ENABLE_WIFI_SUPPORT
 //#define USE_DIGESTAUTH //use this for a little extra security. Maybe change the digest and default password too.
 
-#define VERSIONINFO "SIO_ESP32WRM_Relay_X4 1.1.0"
+#define VERSIONINFO "SIO_ESP32WRM_Relay_X4 1.1.3"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #define DEFAULT_HOSTS_NAME "SIOControler-New"
 #define FLASHSIZE "4MB with spiffs(1.2MB APP/1.5 SPIFFS)"
@@ -17,7 +17,7 @@
 #include "FS.h"
 #include "global.h"
 
-#define FS_NO_GLOBALS
+#define FS_NO_GLOBALS 
 #include <WiFi.h>
 #include <WebServer.h>
 #include <NTPClient.h>
@@ -31,21 +31,85 @@
 
 
 void ConfigIO(){
-  
+  int i_dht = 0;
+  int i_pwm = 0;
   debugMsg("Setting IO");
   for (int i=0;i<IOSize;i++){
     if(IOType[i] == INPUT ||IOType[i] == INPUT_PULLUP || IOType[i] == INPUT_PULLDOWN){ //if it is an input
       pinMode(IOMap[i],IOType[i]);
       Bnc[i].attach(IOMap[i],IOType[i]);
       Bnc[i].interval(5);
+    }else if(IOType[i] == INPUT_DHT){
+      if(i_dht<DHTSize){
+        debugMsgPrefx();Serial.print("Config[DHT:");Serial.print(i_dht);Serial.print("] for IO Number: ");Serial.println(i);
+        dht_sensor[i_dht].setup(IOMap[i], DHTSensor);
+        i_dht = i_dht+1;
+      }else{
+        debugMsg("[Warning!] Exceeded number of DHT sensor configurations.");
+        pinMode(IOMap[i],INPUT); //configure as floating input default.
+      }
+    }else if(IOType[i] == OUTPUT_PWM){
+      if(i_pwm<PWMSize){
+        debugMsgPrefx();Serial.print("Config[PWM:");Serial.print(i_pwm);Serial.print("] for IO Number: ");Serial.println(i);
+        PWM_Instance[i_pwm] = new ESP32_FAST_PWM(IOMap[i], PWMFrequency[i_pwm], PWMDutyCycle[i_pwm], i_pwm, PWMResolution[i_pwm]);
+        pwmMap[i_pwm] = i;
+        i_pwm = i_pwm+1;
+      }else{
+        debugMsg("[Warning!] Exceeded number of PWM OUtput configurations.");
+        pinMode(IOMap[i],INPUT); //configure as floating input default.
+      }
     }else{
       pinMode(IOMap[i],IOType[i]);
       digitalWrite(IOMap[i],LOW);
     }
   }
-
+  
+  pwmSizeDynamic = i_pwm; //set used portion of the array.
+  debugMsgPrefx();Serial.print("pwmSizeDynamic is: ");Serial.println(pwmSizeDynamic);
+  dhtSizeDynamic = i_dht; //set used portion of the array.
+  
 }
 
+void printPWMInfo(ESP32_FAST_PWM* PWM_Instance)
+{
+  debugMsgPrefx(); Serial.print("Actual data: pin = ");
+  Serial.print(PWM_Instance->getPin());
+  Serial.print(", PWM DC = ");
+  Serial.print(PWM_Instance->getActualDutyCycle());
+  Serial.print(", PWMPeriod = ");
+  Serial.print(PWM_Instance->getPWMPeriod());
+  Serial.print(", PWM Freq (Hz) = ");
+  Serial.println(PWM_Instance->getActualFreq());
+}
+
+
+void setPWM(int idx){
+    int pin = PWM_Instance[idx]->getPin();
+    float frq = PWMFrequency[idx] + 0.00f;
+    float dc = PWMDutyCycle[idx]+ 0.00f;
+    if(_debug){debugMsgPrefx();Serial.print("setPWM for idx:");Serial.print(idx);Serial.print(" and Pin:");Serial.println(pin);}
+    PWM_Instance[idx]->setPWM(pin, frq, dc);
+    printPWMInfo(PWM_Instance[idx]);
+
+    if(_debug){
+      debugMsgPrefx(); Serial.print("Array data: pin = ");
+      Serial.print(pwmMap[idx]);
+      Serial.print(", PWM DC = ");
+      Serial.print(PWMDutyCycle[idx]);
+      Serial.print(", PWMResolution = ");
+      Serial.print(PWMResolution[idx]);
+      Serial.print(", PWM Freq (Hz) = ");
+      Serial.println(PWMFrequency[idx]);
+    }
+    return;
+}
+
+void setPWM(){
+  for(int i = 0;i<pwmSizeDynamic;i++){
+    setPWM(i);
+  }
+  return;
+}
 
 
 TimeRelease IOReport;
@@ -65,10 +129,8 @@ void setup() {
   loadIOConfig();
   debugMsg("Initializing IO");
   ConfigIO();
-
-
-  
   reportIOTypes();
+  setPWM(); //does all configured
   debugMsg("End Types");
 
   //need to get a baseline state for the inputs and outputs.
@@ -87,32 +149,27 @@ void setup() {
   DisplayIOTypeConstants();
 
   #ifdef ENABLE_WIFI_SUPPORT
-  SetupWifi();
-  if(_debug){
-    DebugwifiConfig();
-  }
-  #else
-  debugMsg("Disabling Wifi");
-  WiFi.mode(WIFI_OFF);    //The entire point of this project is to not use wifi but have directly connected IO for use with the OctoPrint PlugIn and subPlugIn
-  #endif
-
- if(!loadSettings()){
+    SetupWifi();
     if(_debug){
-      debugMsg("Settings failed to load");
+      DebugwifiConfig();
     }
-  }else{
-    if(_debug){
-      debugMsg("Settings loaded from filesystem.");
-      DebugSettingsConfig();
+    if(!loadSettings()){
+      if(_debug){
+        debugMsg("Settings failed to load");
+      }
+    }else{
+      if(_debug){
+        debugMsg("Settings loaded from filesystem.");
+        DebugSettingsConfig();
+      }
     }
-  }
-  
-  #ifdef ENABLE_WIFI_SUPPORT
-  debugMsg("begin init pages");
-  initialisePages();
-  debugMsg("end init pages");
-  webServer.begin();
-  debugMsg("end webserver.begin");
+    
+    
+    debugMsg("begin init pages");
+    initialisePages();
+    debugMsg("end init pages");
+    webServer.begin();
+    debugMsg("end webserver.begin");
   #endif
   
   _debug = false; //start up is over.. debug in loop can be turned on by serial command.
@@ -129,6 +186,7 @@ void loop() {
   if(!_pauseReporting){
     ioChanged = checkIO();
     reportIO(ioChanged);
+    
     if(ReadyForCommands.check()){
       Serial.println("RR"); //send ready for commands   
       ReadyForCommands.set(reportInterval *3);
@@ -143,16 +201,18 @@ void loop() {
 
 void reportIO(bool forceReport){
   if (IOReport.check()||forceReport){
+    DHTStatus();
     Serial.print("IO:");
     for (int i=0;i<IOSize;i++){
-      //if(IOType[i] == 1 ){ //if it is an input
-        IO[i] = digitalRead(IOMap[i]);  
-      //}
+      if(IOType[i] == INPUT_DHT || IOType[i] == OUTPUT_PWM){
+        IO[i] = 0; //always report a zero for DHT/PWM when reporting digital IO state
+      }else{
+        IO[i] = digitalRead(IOMap[i]); 
+      }
       Serial.print(IO[i]);
     }
     Serial.println();
     IOReport.set(reportInterval);
-    
   }
 }
 
@@ -160,15 +220,14 @@ bool checkIO(){
   bool changed = false;
   
   for (int i=0;i<IOSize;i++){
-    if(!isOutPut(i)){
+    if(isINPUT(i)){
       Bnc[i].update();
       if(Bnc[i].changed()){
        changed = true;
        IO[i]=Bnc[i].read();
        if(_debug){debugMsg("Input Changed: "+String(i));}
       }
-    }else{
-      
+    }else if(isOutPut(i)){
       //is the current state of this output not the same as it was on last report.
       //this really should not happen if the only way an output can be changed is through Serial commands.
       //the serial commands force a report after it takes action.
@@ -176,8 +235,9 @@ bool checkIO(){
         if(_debug){debugMsg("Output Changed: "+String(i));}
         changed = true;
       }
+    }else if(IOType[i] == INPUT_DHT || IOType[i] == OUTPUT_PWM ){
+      //not checking digital change on this type of IO
     }
-    
   }
     
   return changed;
@@ -196,11 +256,15 @@ void reportIOTypes(){
 }
 
 void DisplayIOTypeConstants(){
-  debugMsgPrefx();Serial.print("INPUT:");Serial.println(INPUT);//1
-  debugMsgPrefx();Serial.print("OUTPUT:");Serial.println(OUTPUT);//2
-  debugMsgPrefx();Serial.print("INPUT_PULLUP:");Serial.println(INPUT_PULLUP);//5
-  debugMsgPrefx();Serial.print("INPUT_PULLDOWN:");Serial.println(INPUT_PULLDOWN);//9
-  debugMsgPrefx();Serial.print("OUTPUT_OPEN_DRAIN:");Serial.println(OUTPUT_OPEN_DRAIN);//18
+  Serial.print("TC ");
+  Serial.print("INPUT:");Serial.print(INPUT);Serial.print(",");//1
+  Serial.print("OUTPUT:");Serial.print(OUTPUT);Serial.print(",");//2
+  Serial.print("INPUT_PULLUP:");Serial.print(INPUT_PULLUP);Serial.print(",");//5
+  Serial.print("INPUT_PULLDOWN:");Serial.print(INPUT_PULLDOWN);Serial.print(",");//9
+  Serial.print("OUTPUT_OPEN_DRAIN:");Serial.print(OUTPUT_OPEN_DRAIN);Serial.print(",");//18
+  Serial.print("INPUT_DHT:");Serial.print(INPUT_DHT);Serial.print(",");//-3
+  Serial.print("OUTPUT_PWM:");Serial.println(OUTPUT_PWM);//-2
+    
 }
 
 
@@ -254,6 +318,8 @@ void checkSerial(){
       Serial.println(COMPATIBILITY);
       Serial.print("FS:");
       Serial.println(FLASHSIZE);
+      Serial.print("XT BRD:");
+      Serial.println(ARDUINO_BOARD);
       
     }
     else if (command == "IC") { //io count.
@@ -291,6 +357,11 @@ void checkSerial(){
     else if(command=="IOT"){
       ack();
       reportIOTypes();
+      return;
+    }
+    else if(command == "TC"){
+      ack();
+      DisplayIOTypeConstants();
       return;
     }
     
@@ -377,7 +448,43 @@ void checkSerial(){
       reportIO(true);
       return; 
     }
-    
+    else if(command == "FS") {
+      ack();
+      if (value == "FormatSPIFFS"){
+        bool result = SPIFFS.format();
+        if(result){debugMsg("SPIFFS Format Success");}else{debugMsg("SPIFFS Format Failed");}    
+      }else if(value == "RemoveSavedIOSettings"){
+        bool result = RemoveIOSettings();
+        if(result){debugMsg("IOSettings Remove Success");}else{debugMsg("IOSettings Remove Failed");}    
+      }
+      
+    }else if(command == "PWM"){
+        int istart = 0;
+        int iend = value.indexOf(" ",istart);
+        int ION = value.substring(istart,iend).toInt();
+
+        istart = iend+1;
+        iend = value.indexOf(" ",istart);
+        float dc = value.substring(istart,iend).toFloat(); //dutyCycle
+
+        istart = iend+1;
+        iend = value.indexOf(" ",istart);
+        float freq = value.substring(istart,iend).toFloat(); //frequency
+        
+        debugMsgPrefx();Serial.print("ION: ");Serial.print(ION); Serial.print(" DC: "); Serial.print(dc);Serial.print(" Fq: "); Serial.println(freq);
+        for(int idx=0;idx<pwmSizeDynamic;idx++){
+          debugMsgPrefx();Serial.print("pwmMap[");Serial.print(idx);Serial.print("] is [");Serial.print(pwmMap[idx]);Serial.println("]");
+          if(pwmMap[idx] == ION){
+            PWMFrequency[idx] = freq;
+            PWMDutyCycle[idx] = dc;
+            setPWM(idx);
+            debugMsg("PWM for IO Updated");
+            break;
+          }
+        }
+        //debugMsg("No PWM Configuration on IO Point supplied");
+        
+    }
     #ifdef ENABLE_WIFI_SUPPORT
     else if(command == "WF"){
       
@@ -458,25 +565,57 @@ void ack(){
 
 
 bool validateNewIOConfig(String ioConfig){
+  int newConfig[IOSize];
+  int incomingSize = 0;
   
-  if(ioConfig.length() != IOSize){
-    debugMsg("IOConfig validation failed(Wrong len): required len["+ String(IOSize) + "] supplied len[" +String(ioConfig.length()) + "]" );
+  if(ioConfig.length() == (IOSize*3+1)){
+    debugMsg("IOConfig validation failed(Wrong len): required minimal len["+ String(IOSize*3+1) + "] supplied len[" +String(ioConfig.length()) + "]" );
     return false;  
   }
-  
-  for (int i=0;i<IOSize;i++){
-    String spointType = ioConfig.substring(i,i+1);
-    int pointType = ioConfig.substring(i,i+1).toInt();
-    //if point type is a non number it will parse to zero(0) cant be out of range (-n) or (4+)
-    if((spointType != "0" && pointType == 0) || pointType > 4 || pointType < 0){
-      debugMsg("IOConfig validation failed");debugMsg("Bad IO Point type: index[" +String(i)+"] type["+spointType+"]");
+
+  for(int i=0;i<IOSize;i++){
+    int istart = i*3;
+    String token = ioConfig.substring(istart,istart+2);
+    if(_debug){debugMsgPrefx();Serial.print("Token: ");Serial.println(token.toInt());}
+    newConfig[i] = token.toInt();
+    if(!isValidIOType(newConfig[i])){
+      debugMsgPrefx();Serial.print("IO Type is invalid: [");Serial.print(token.toInt());Serial.print("] @ position:[");Serial.print(i);Serial.println("]");
       return false;
     }
+    incomingSize = i;
   }
-  if(_debug){debugMsg("IOConfig validation good");}
-  return true; //seems its a good set of point Types.
+
+  if(incomingSize+1 != IOSize){
+    debugMsg("IOConfig validation failed. IO pattern did not have the correct number of point configs.");
+    debugMsg("IO Count: " + String(IOSize));
+    debugMsg("Parttern Count: " + String(incomingSize));
+    return false;
+  }
+
+  if(_debug){
+    debugMsg("New Config passed Validation");
+    debugMsgPrefx();
+    for(int i=0;i< IOSize;i++){
+      Serial.print("[");Serial.print(newConfig[i]);Serial.print("],");
+    }
+    Serial.println("");
+  }
+
+ return true; //seems its a good set of point Types.
+ 
 }
 
+
+bool isValidIOType(int ioType){
+  if(ioType == INPUT){return true;}
+  if(ioType == OUTPUT){return true;}
+  if(ioType == INPUT_PULLUP){return true;}
+  if(ioType == INPUT_PULLDOWN){return true;}
+  if(ioType == OUTPUT_OPEN_DRAIN){return true;}
+  if(ioType == OUTPUT_PWM){return true;}
+  if(ioType == INPUT_DHT){return true;}
+  return false;
+}
 
 int getIOType(String typeName){
   if(typeName == "INPUT"){return INPUT;}
@@ -485,11 +624,33 @@ int getIOType(String typeName){
   if(typeName == "INPUT_PULLDOWN"){return INPUT_PULLDOWN;}
   if(typeName == "OUTPUT_OPEN_DRAIN"){return OUTPUT_OPEN_DRAIN;} //not sure on this value have to double check
   if(typeName == "OUTPUT_PWM"){return OUTPUT_PWM;} //not sure on this value have to double check
+  if(typeName == "INPUT_DHT"){return INPUT_DHT;} //not sure on this value have to double check
+  return -1;
 }
+
+String IOSettingsFile = "/IOConfig.json";
+
+bool RemoveIOSettings(){
+  if (SPIFFS.exists(IOSettingsFile)){
+    SPIFFS.remove(IOSettingsFile);
+  }else{
+    debugMsg("[WARNING]: IOConfig file not found!");
+  }
+
+  if (SPIFFS.exists(IOSettingsFile)){
+    return false;
+  }else{
+    return true;
+  }
+
+  
+  
+}
+
 
 bool loadIOConfig(){
   
-if (!SPIFFS.exists("/IOConfig.json"))
+  if (!SPIFFS.exists(IOSettingsFile))
   {
     debugMsg("[WARNING]: IOConfig file not found!");
     debugMsg("Using Default Config");
@@ -497,7 +658,7 @@ if (!SPIFFS.exists("/IOConfig.json"))
   }
   
   
-  File configfile = SPIFFS.open("/IOConfig.json","r");
+  File configfile = SPIFFS.open(IOSettingsFile,"r");
 
   DynamicJsonDocument doc(2048);
 
@@ -528,6 +689,27 @@ if (!SPIFFS.exists("/IOConfig.json"))
 }
 
 
+bool DHTStatus() {
+    if(_debug){debugMsg("begin DHT status");}
+    if(dhtSizeDynamic > 0){
+      for (int i=0;i<dhtSizeDynamic;i++){
+        if(_debug){debugMsgPrefx();Serial.print("i_dht:");Serial.println(i);}
+        DTHValues[i] = dht_sensor[i].getTempAndHumidity();
+        if (dht_sensor[i].getStatus() == 0) {
+            Serial.print("XT DHT ");Serial.print(i);Serial.print(" ");Serial.print(DTHValues[i].temperature);Serial.print(" ");Serial.println(DTHValues[i].humidity);
+        }else{
+          //Not sure yet if we should re print the last values. Maybe for a timeout but other errors just show.
+          if(_debug){
+            debugMsgPrefx();Serial.print("DHT Status return Error code:");Serial.print(dht_sensor[i].getStatus());Serial.print(";");Serial.println(dht_sensor[i].getStatusString());
+          }
+        }
+      
+      }
+    }
+    if(_debug){debugMsg("end DHT status");}
+    return true;
+}
+
 
 
 
@@ -557,8 +739,10 @@ bool IsSpaceLeft()
 #define FORMAT_SPIFFS_IF_FAILED true
 
 void InitStorageSetup(){
+   debugMsg("Warning SPIFFS Mounting. You may get a failed message next on first run. Let it run for 60 seconds and it should finish formatting and complete the mount."); 
    if(!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)){
       debugMsg("Warning SPIFFS Mount Failed (Attempt Restart if this is the first time this firmware was loaded.)");
       return;
    }
+   debugMsg("SPIFFs is Mounted");
 }
