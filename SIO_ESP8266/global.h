@@ -6,13 +6,13 @@
 //this link has some details on how to use the IO points 0,2 and 15 as inputs or outputs
 //https://www.instructables.com/ESP8266-Using-GPIO0-GPIO2-as-inputs/
 
-#define IO0 LED_BUILTIN //Ya this is on the chip.. so we can show some kind of staus of we want. good test IO Point to play with. Blue LED on MCU
-#define IO1 5 //  Relay1 has relay and red led D1 on board near power in terminal
-#define IO2 4//   Relay1 has relay and red led D4 on board near power in terminal
-#define IO3 16// has blue LED on board D7 
-#define IO4 14//   
-#define IO5 12//
-#define IO6 13//  
+#define IO0 LED_BUILTIN //Active LOW. Ya this is on the chip.. good test IO Point to play with. Blue LED on MCU. Also Programing Switch. attach to ground on start up. Posts are on same line as the UART interface.
+#define IO1 5  // Relay1 has relay and red led D1 on board near power in terminal
+#define IO2 4  //  Relay1 has relay and red led D4 on board near power in terminal
+#define IO3 16 // has blue LED on board D7 Active LOW. Also has post on header next to chip
+#define IO4 14 // post on header next to chip  
+#define IO5 12 // post on header next to chip
+#define IO6 13 // post on header next to chip
 
  
   

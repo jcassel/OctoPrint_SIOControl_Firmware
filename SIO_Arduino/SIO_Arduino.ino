@@ -1,9 +1,12 @@
-
-#define VERSIONINFO "SIO_Arduino_General 1.0.10"
+//#define includeDebug
+#define VERSIONINFO "SIO_Arduino_General 1.0.11"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
+#define FLASHSIZE "NA"
+
 #include "TimeRelease.h"
 #include <Bounce2.h>
 #include <EEPROM.h>
+
 
 bool _debug = false;
 
@@ -28,7 +31,7 @@ bool _debug = false;
   #define IO16 A5
   #define IO17 A6
   #define IO18 A7 
-
+  const int IOTYPE_DEFAULT[IOSize]{OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, INPUT, INPUT, INPUT, INPUT, INPUT, INPUT, INPUT, INPUT };
   int IOType[IOSize]{OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, OUTPUT, INPUT, INPUT, INPUT, INPUT, INPUT, INPUT, INPUT, INPUT };
   int IOMap[IOSize] {IO0,IO1,IO2,IO3,IO4,IO5,IO6,IO7,IO8,IO9,IO10,IO11,IO12,IO13,IO14,IO15,IO16,IO17,IO18};
   String IOSMap[IOSize] {"IO0","IO1","IO2","IO3","IO4","IO5","IO6","IO7","IO8","IO9","IO10","IO11","IO12","IO13","IO14","IO15","IO16","IO17","IO18"};  
@@ -54,7 +57,8 @@ bool _debug = false;
   #define IO15 A3 // pin22/A3
   #define IO16 A4 // pin23/A4
   #define IO17 A5 // pin24/A5
-  int IOType[IOSize]{INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT}; //0-19
+  const int IOTYPE_DEFAULT[IOSize]{INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT}; //0-17
+  int IOType[IOSize]{INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT}; //0-17
   int IOMap[IOSize] {IO0,IO1,IO2,IO3,IO4,IO5,IO6,IO7,IO8,IO9,IO10,IO11,IO12,IO13,IO14,IO15,IO16,IO17};
   String IOSMap[IOSize] {"IO0","IO1","IO2","IO3","IO4","IO5","IO6","IO7","IO8","IO9","IO10","IO11","IO12","IO13","IO14","IO15","IO16","IO17"};  
  
@@ -68,7 +72,19 @@ bool _debug = false;
 int IO[IOSize];
 Bounce Bnc[IOSize];
 bool EventTriggeringEnabled = 1;
- 
+
+
+bool RemoveIOSettings(){
+  //updating IO Settings in EProm to be defaults.
+  for (int i=0;i<IOSize;i++){
+    IOType[i] = IOTYPE_DEFAULT[i];
+  }
+  StoreIOConfig(); 
+  ConfigIO();
+  return true;
+  
+}
+
 
 void StoreIOConfig(){
   #ifdef includeDebug
@@ -322,10 +338,13 @@ void checkSerial(){
       return;
     }
     else if (command == "VC"){//version and compatibility
+      ack();
       Serial.print(F("VI:"));
       Serial.println(VERSIONINFO);
       Serial.print(F("CP:"));
       Serial.println(COMPATIBILITY);
+      Serial.print("FS:");
+      Serial.println(FLASHSIZE);
       Serial.print("XT BRD:");
       #ifdef __AVR_ATmega1280__
         Serial.print("ATmega1280");
@@ -479,7 +498,15 @@ void checkSerial(){
       reportIO(true);
       return; 
     }
-   
+    else if(command == "FS") {
+      ack();
+      if (value == "FormatSPIFFS"){
+        debugMsg(F("FormatSPIFFS is Not Supported IN Ardino"));
+      }else if(value == "RemoveSavedIOSettings"){
+        bool result = RemoveIOSettings();
+        if(result){debugMsg(F("IOSettings Remove Success"));}else{debugMsg(F("IOSettings Remove Failed"));}    
+      }
+    }
     else{
       debugMsgPrefx();Serial.print(F("ERR: bad cmnd["));Serial.print(command);Serial.println(F("]"));
     }
@@ -588,6 +615,9 @@ int getIOType(String typeName){
   //if(typeName == "INPUT_DHT"){return INPUT_DHT;} //not sure on this value have to double check
   return -1;
 }
+
+
+
 
 
 void debugMsg(String msg){
