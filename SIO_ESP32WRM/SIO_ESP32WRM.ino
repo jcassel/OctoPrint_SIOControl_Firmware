@@ -5,7 +5,7 @@
 //#define USE_DIGESTAUTH //use this for a little extra security. Maybe change the digest and default password too.
 //#define _PWM_LOGLEVEL_ 4 //4 is verbose
 
-#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.1.3"
+#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.1.4"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #define DEFAULT_HOSTS_NAME "SIOControler-New"
 #define FLASHSIZE "4MB with spiffs(1.2MB APP/1.5 SPIFFS)"
@@ -318,6 +318,7 @@ void checkSerial(){
       return;
     }
     else if (command == "VC"){//version and compatibility
+      ack();
       Serial.print("VI:");
       Serial.println(VERSIONINFO);
       Serial.print("CP:");
@@ -444,7 +445,10 @@ void checkSerial(){
       return;
     }
     else if (command == "restart" || command == "reset" || command == "reboot"){
+      ack();
+      delay(500);
       debugMsg("[WARNING]: Restarting device");
+      delay(500);
       ESP.restart();
     }
 
@@ -465,6 +469,7 @@ void checkSerial(){
       }
       
     }else if(command == "PWM"){
+        ack();
         int istart = 0;
         int iend = value.indexOf(" ",istart);
         int ION = value.substring(istart,iend).toInt();
@@ -557,6 +562,7 @@ void checkSerial(){
     }
     #endif //ENABLE_WIFI_SUPPORT
     else{
+      ack();
       debugMsg("ERROR: Unrecognized command["+command+"]");
     }
   }

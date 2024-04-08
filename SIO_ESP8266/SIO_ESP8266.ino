@@ -10,9 +10,10 @@
 #include "global.h"
 #define _GDebug 
 #define USE_DIGESTAUTH
-#define VERSIONINFO "SIO_ESP12F_Relay_X2 1.0.9"
+#define VERSIONINFO "SIO_ESP12F_Relay_X2 1.0.10"
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #define DEFAULT_HOSTS_NAME "SIOControler-New"
+#define FLASHSIZE "4MB with spiffs(2MB APP/1019 SPIFFS)"
 #include "TimeRelease.h"
 
 
@@ -193,11 +194,12 @@ void reportIOTypes(){
 }
 
 void DisplayIOTypeConstants(){
-  debugMsgPrefx();Serial.print("INPUT:");Serial.println(INPUT);//0
-  debugMsgPrefx();Serial.print("OUTPUT:");Serial.println(OUTPUT);//1
-  debugMsgPrefx();Serial.print("INPUT_PULLUP:");Serial.println(INPUT_PULLUP);//2
+  Serial.print("TC ");
+  Serial.print("INPUT:");Serial.print(INPUT);Serial.print(",");//0
+  Serial.print("OUTPUT:");Serial.print(OUTPUT);Serial.print(",");//1
+  Serial.print("INPUT_PULLUP:");Serial.print(INPUT_PULLUP);Serial.print(",");//2
   //debugMsgPrefx();Serial.print("INPUT_PULLDOWN:");Serial.println(INPUT_PULLDOWN);//9 not avalible in ESP8266
-  debugMsgPrefx();Serial.print("OUTPUT_OPEN_DRAIN:");Serial.println(OUTPUT_OPEN_DRAIN);//3
+  Serial.print("OUTPUT_OPEN_DRAIN:");Serial.println(OUTPUT_OPEN_DRAIN);//3
 }
 
 void checkSerial(){
@@ -243,10 +245,15 @@ void checkSerial(){
       return;
     }
     else if (command == "VC"){//version and compatibility
+      ack();
       Serial.print("VI:");
       Serial.println(VERSIONINFO);
       Serial.print("CP:");
       Serial.println(COMPATIBILITY);
+      Serial.print("FS:");
+      Serial.println(FLASHSIZE);
+      Serial.print("XT BRD:");
+      Serial.println(ARDUINO_BOARD);
     }
     else if (command == "IC") { //io count.
       ack();
@@ -283,6 +290,11 @@ void checkSerial(){
     else if(command=="IOT"){
       ack();
       reportIOTypes();
+      return;
+    }
+    else if(command == "TC"){
+      ack();
+      DisplayIOTypeConstants();
       return;
     }
     
@@ -359,7 +371,10 @@ void checkSerial(){
       return;
     }
     else if (command == "restart" || command == "reset" || command == "reboot"){
+      ack();
+      delay(500);
       debugMsg("[WARNING]: Restarting device");
+      delay(500);
       ESP.restart();
     }
 
@@ -369,7 +384,16 @@ void checkSerial(){
       reportIO(true);
       return; 
     }
-    
+    else if(command == "FS") {
+      ack();
+      if (value == "FormatSPIFFS"){
+        bool result = SPIFFS.format();
+        if(result){debugMsg("SPIFFS Format Success");}else{debugMsg("SPIFFS Format Failed");}    
+      }else if(value == "RemoveSavedIOSettings"){
+        bool result = RemoveIOSettings();
+        if(result){debugMsg("IOSettings Remove Success");}else{debugMsg("IOSettings Remove Failed");}    
+      }
+    }
     #ifdef ENABLE_WIFI_SUPPORT
     else if(command == "WF"){
       
@@ -470,15 +494,32 @@ int getIOType(String typeName){
   if(typeName == "OUTPUT_OPEN_DRAIN"){return 3;} //not sure on this value have to double check
 }
 
+String IOSettingsFile = "/IOConfig.json";
+
+bool RemoveIOSettings(){
+  if (SPIFFS.exists(IOSettingsFile)){
+    SPIFFS.remove(IOSettingsFile);
+  }else{
+    debugMsg("[WARNING]: IOConfig file not found!");
+  }
+
+  if (SPIFFS.exists(IOSettingsFile)){
+    return false;
+  }else{
+    return true;
+  }
+}
+
+
 bool loadIOConfig(){
   
-if (!SPIFFS.exists("/IOConfig.json"))
+if (!SPIFFS.exists(IOSettingsFile))
   {
     debugMsg("[WARNING]: IOConfig file not found!");
     debugMsg("Using Default Config");
     return false;
   }
-  File configfile = SPIFFS.open("/IOConfig.json","r");
+  File configfile = SPIFFS.open(IOSettingsFile,"r");
 
   DynamicJsonDocument doc(2048);
 
