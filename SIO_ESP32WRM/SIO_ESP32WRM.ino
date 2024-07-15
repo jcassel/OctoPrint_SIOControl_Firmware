@@ -1,14 +1,37 @@
 //Simple Serial IO Driver
 //Takes serial commands to control configured IO.
 //Reports IO status created for use with OctoPrint_SIOControl_plugin
-//#define ENABLE_WIFI_SUPPORT
-//#define USE_DIGESTAUTH //use this for a little extra security. Maybe change the digest and default password too.
-//#define _PWM_LOGLEVEL_ 4 //4 is verbose
 
-#define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.1.4"
+
+//#define ENABLE_WIFI_SUPPORT //This is not well tested yet. It also is not complete but the parts that are there should work. Report anything you find if you do use this. 
+//#define USE_DIGESTAUTH //Used with the "ENABLE_WIFI_SUPPORT" use this for a little extra security. Maybe change the digest and default password too.
+//#define _PWM_LOGLEVEL_ 4 //4 is The most verbose and all but imposible to keep up with. 
+
+
+/*******************************************************  !!! Choose one below !!! **************************
+ *   this selection is mostly about the IO setup. These are the 2 standard esp32 board configs.
+ *   WMR2: 2 relay version 
+ *   WMR4: 4 relay version 
+ *   If you are using another board, you can really use either one and just adjust the defaults for your local copy of the firmware.
+ *   The reported Version info (directly below) and 2 sections at the top of the "global.h" file where these are used. Be sure to review and make 
+ *   needed changes. 
+*/
+
+#define WMR2
+//#define WMR4
+
+//I will likely break this into 2 parts in the future so that there is only one M.m.r number.
+#ifdef WMR2
+  #define VERSIONINFO "SIO_ESP32WRM_Relay_X2 1.1.5"
+#elif defined(WMR4)
+  #define VERSIONINFO "SIO_ESP32WRM_Relay_X4 1.1.5"
+#else
+  #define VERSIONINFO "SIO_ESP32WRM_Relay_?? 1.1.5"
+#endif 
+
 #define COMPATIBILITY "SIOPlugin 0.1.1"
 #define DEFAULT_HOSTS_NAME "SIOControler-New"
-#define FLASHSIZE "4MB with spiffs(1.2MB APP/1.5 SPIFFS)"
+#define FLASHSIZE "4MB with spiffs(1.2MB APP/1.5 SPIFFS)" //note this is ESP32 Wrover Module
 
 
 #include "TimeRelease.h"

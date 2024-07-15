@@ -6,8 +6,9 @@ One of the goals of this project is to make it easy for people that dont have th
 If you have a board / MCU you perfer, you likley can just modify the Firmware and get moving. Knowing what MCU is on that board should give you a good starting point if you have another board with the same MCU.
 
 
-If you are looking for some support, I will be working on the wiki. Check it out. If you dont find what you are looking for there, I lurk a lot on the [OctoPrint community site](https://community.octoprint.org/). Post there in the plugins section and I will likely see it and respond. 
-
+If you are looking for some support, checkout the [Firmware wiki](https://github.com/jcassel/OctoPrint_SIOControl_Firmware/wiki) and the [PlugIn wiki](https://github.com/jcassel/OctoPrint-Siocontrol/wiki). 
+If you dont find what you are looking for there, I lurk a lot on the [OctoPrint community site](https://community.octoprint.org/). Post there in the plugins section and I will likely see it and respond.
+You can also post an issue in the [issues area here on GitHub](https://github.com/jcassel/OctoPrint_SIOControl_Firmware/issues).
 
 ## Prerequisites for ESP32 Versions.
 

@@ -2,7 +2,7 @@
 #include <ArduinoJson.h> 
 
 
-
+bool _debug = false;
 
 
 //note that there are some IO points that are not optimal to use as basic IO points. There state at start up of the 
@@ -19,21 +19,40 @@
 //Additionally IO 34,35,36,and39 can only be used as inputs.
 //reference: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
 
-
-#define IO0 34//  input only (Must configure (in code)without pullup or down. These inputs do not have these on chip)
-#define IO1 35//  input only  (Must configure (in code)without pullup or down. These inputs do not have these on chip)
-#define IO2 36//  input only (Labeled as SVP)  (Must configure (in code)without pullup or down. These inputs do not have these on chip)
-#define IO3 39//  input only (Labeled as SVN)  (Must configure (in code)without pullup or down. These inputs do not have these on chip)
-#define IO4 0//  general IO  Important note.. if this is in a low state on boot of the device, it will go into programing mode. 
-#define IO5 5//  general IO
-#define IO6 12//  general IO
-#define IO7 13//  general IO
-#define IO8 14//  general IO
-#define IO9 33//  general IO
-#define IO10 25//  general IO
-#define IO11 16 // Relay1
-#define IO12 17//  Relay2
-#define IO13 23//  output has the board built in LED attached. Active LOW.
+#ifdef WMR2
+  #define IO0 34//  input only (Must configure (in code)without pullup or down. These inputs do not have these on chip)
+  #define IO1 35//  input only  (Must configure (in code)without pullup or down. These inputs do not have these on chip)
+  #define IO2 36//  input only (Labeled as SVP)  (Must configure (in code)without pullup or down. These inputs do not have these on chip)
+  #define IO3 39//  input only (Labeled as SVN)  (Must configure (in code)without pullup or down. These inputs do not have these on chip)
+  #define IO4 0//  general IO  Important note.. if this is in a low state on boot of the device, it will go into programing mode. 
+  #define IO5 5//  general IO
+  #define IO6 12//  general IO
+  #define IO7 13//  general IO
+  #define IO8 14//  general IO
+  #define IO9 33//  general IO
+  #define IO10 25//  general IO
+  #define IO11 16 // Relay1
+  #define IO12 17//  Relay2
+  #define IO13 23//  output has the board built in LED attached. Active LOW.
+#endif
+#ifdef WMR4
+  #define IO0 34  //  Input Only (Must configure(in code) without pullup or down. These inputs do not have these on chip)
+  #define IO1 35  //  Input Only (Must configure(in code) without pullup or down. These inputs do not have these on chip)
+  #define IO2 36  //  Input Only (Must configure(in code) without pullup or down. These inputs do not have these on chip)
+  #define IO3 39  //  input only (Must configure(in code) without pullup or down. These inputs do not have these on chip)
+  #define IO4 0   //  general IO Important note.. if this is in a low state on boot of the device, it will go into programing mode.
+  #define IO5 5   //  general IO Important note.. Will output a PWM signal on boot. Should not have any affect if configured as an input.
+  #define IO6 12  //  general IO Important note.. boot will failif this is pulled high during boot.
+  #define IO7 13  //  general IO touch capable
+  #define IO8 14  //  general IO Important note.. Will output a PWM signal on boot. Should not have any affect if configured as an input.
+  #define IO9 16  //  general IO (RXD 2)
+  #define IO10 17 //  general IO (TXD 2)
+  #define IO11 26 //  Relay K1
+  #define IO12 25 //  Relay K2
+  #define IO13 33 //  Relay K3
+  #define IO14 32 //  Relay K4
+  #define IO15 23 //  output only LED 
+#endif
 
 #define OUTPUT_PWM -2 //Output Type For PWM
 #define INPUT_DHT -3 //Input Type for DHT Module Reading. 
@@ -62,11 +81,21 @@ int PWMResolution[PWMSize] = {12,12,12,12};  //Resolution is 4096 this is ok res
 // Resolution  256  ( 8-bit)for higher frequencies, OK @ 100K, 200K
 // Resolution  128  ( 7-bit) for higher frequencies, OK @ 500K
 
-#define IOSize  14 //number should be one more than the IO# :) (must include the idea of Zero) 
-bool _debug = false;
-int IOType[IOSize]{INPUT,INPUT,INPUT,INPUT,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,OUTPUT,OUTPUT,OUTPUT};
-int IOMap[IOSize] {IO0,IO1,IO2,IO3,IO4,IO5,IO6,IO7,IO8,IO9,IO10,IO11,IO12,IO13};
-String IOSMap[IOSize] {"IO0","IO1","IO2","IO3","IO4","IO5","IO6","IO7","IO8","IO9","IO10","IO11","IO12","IO13"};
+#ifdef WMR2
+  #define IOSize  14 //number should be one more than the IO# :) (must include the idea of Zero) 
+  int IOType[IOSize]{INPUT,INPUT,INPUT,INPUT,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,OUTPUT,OUTPUT,OUTPUT};
+  int IOMap[IOSize] {IO0,IO1,IO2,IO3,IO4,IO5,IO6,IO7,IO8,IO9,IO10,IO11,IO12,IO13};
+  String IOSMap[IOSize] {"IO0","IO1","IO2","IO3","IO4","IO5","IO6","IO7","IO8","IO9","IO10","IO11","IO12","IO13"};
+#endif
+
+#ifdef WMR4
+  #define IOSize  16 //number should be one more than the IO# :) (must include the idea of Zero) 
+  int IOType[IOSize]{INPUT,INPUT,INPUT,INPUT,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,INPUT_PULLUP,OUTPUT,OUTPUT,OUTPUT,OUTPUT,OUTPUT};
+  int IOMap[IOSize] {IO0,IO1,IO2,IO3,IO4,IO5,IO6,IO7,IO8,IO9,IO10,IO11,IO12,IO13,IO14,IO15};
+  String IOSMap[IOSize] {"IO0","IO1","IO2","IO3","IO4","IO5","IO6","IO7","IO8","IO9","IO10","IO11","IO12","IO13","IO14","IO15"};
+#endif
+
+
 int IO[IOSize];
 Bounce Bnc[IOSize];
 bool EventTriggeringEnabled = 1; 
